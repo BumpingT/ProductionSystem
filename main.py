@@ -480,36 +480,8 @@ class App:
     
     # ── Management dialogs ──
     def manage_materials(self):
-        top = Toplevel(self.root); top.title('管理物料'); top.geometry('500x400')
-        top.configure(bg=CARD); top.grab_set()
-        Label(top, text='物料列表', font=('Microsoft YaHei',12,'bold'), bg=CARD, fg=DARK).pack(anchor=W, padx=16, pady=(10,4))
-        tr = ttk.Treeview(top, columns=('name','price'), show='headings', height=10)
-        tr.heading('name', text='名称'); tr.heading('price', text='单价(元)')
-        tr.column('name', width=200); tr.column('price', width=100)
-        def ref():
-            tr.delete(*tr.get_children())
-            for m in get_materials(): tr.insert('', END, values=(m['name'], m['price']))
-        ref(); tr.pack(fill=BOTH, expand=True, padx=16)
-        f = Frame(top, bg=CARD); f.pack(fill=X, padx=16, pady=6)
-        e_n = Entry(f, width=12, font=('Microsoft YaHei',11), relief='solid', bd=1)
-        e_n.pack(side=LEFT, padx=(0,4)); _set_placeholder(e_n, '名称')
-        e_p = Entry(f, width=8, font=('Microsoft YaHei',11), relief='solid', bd=1)
-        e_p.pack(side=LEFT, padx=(0,4)); _set_placeholder(e_p, '单价')
-        def do_add():
-            n = e_n.get().strip(); p = e_p.get().strip()
-            if n == getattr(e_n,'_ph_text',None): n = ''
-            if not n: return
-            try: price = float(p) if p else 0
-            except: price = 0
-            if add_material(n, price): ref(); e_n.delete(0,END); e_p.delete(0,END)
-        Button(f, text='添加', bg=ACCENT, fg='white', font=('Microsoft YaHei',9,'bold'),
-               relief='flat', padx=8, cursor='hand2', command=do_add).pack(side=LEFT)
-        def do_del():
-            sel = tr.selection()
-            if sel:
-                v = tr.item(sel[0],'values')
-                if messagebox.askyesno('确认', f'删除物料 "{v[0]}"？'): delete_material(int(v[0])); ref()
-        Button(f, text='删除', bg=RED, fg='white', relief='flat', padx=8, cursor='hand2', command=do_del).pack(side=LEFT, padx=(4,0))
+        from ui.dialogs.material_dialog import MaterialDialog
+        MaterialDialog(self.root)
     
     def manage_workers(self):
         top = Toplevel(self.root); top.title('管理工人'); top.geometry('620x500')
