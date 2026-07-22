@@ -145,9 +145,7 @@ class App:
         def do_login():
             un = un_entry.get().strip(); pw = pw_entry.get()
             if not un or not pw: messagebox.showinfo('提示','请输入用户名和密码'); return
-            conn = get_conn()
-            r = conn.execute("SELECT * FROM users WHERE username=?", (un,)).fetchone()
-            conn.close()
+            r = UserRepository.get_by_username(un)
             if not r or not _verify_pw(pw, r['password_hash']):
                 messagebox.showerror('错误','用户名或密码错误'); return
             self.current_user = dict(r)
@@ -371,13 +369,10 @@ class App:
             if not opw or not npw: err2.config(text='请填写完整'); return
             if npw != cpw: err2.config(text='两次新密码不一致'); return
             if len(npw) < 4: err2.config(text='新密码至少4位'); return
-            conn = get_conn()
-            r = conn.execute("SELECT * FROM users WHERE username=?", (un,)).fetchone()
-            if not r: err2.config(text='用户不存在'); conn.close(); return
-            if not _verify_pw(opw, r['password_hash']): err2.config(text='旧密码错误'); conn.close(); return
-            h = _hash_pw(npw)
-            conn.execute("UPDATE users SET password_hash=? WHERE username=?", (h, un))
-            conn.commit(); conn.close()
+            user = UserRepository.get_by_username(un)
+            if not user: err2.config(text='用户不存在'); return
+            if not _verify_pw(opw, user['password_hash']): err2.config(text='旧密码错误'); return
+            UserRepository.update_password(un, npw)
             messagebox.showinfo('成功', '密码修改成功'); cp.destroy()
         Button(cp, text='确认修改', bg=ACCENT, fg='white', font=('Microsoft YaHei',10,'bold'),
                relief='flat', padx=20, pady=2, cursor='hand2', command=do_change).pack(pady=(6,0))
