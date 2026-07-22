@@ -880,29 +880,45 @@ class App:
                relief='flat', padx=8, cursor='hand2', command=do_del).pack(side=LEFT, padx=(4,0))
     
     def manage_permissions(self):
-        top = Toplevel(self.root); top.title('权限管理'); top.geometry('800x500')
+        top = Toplevel(self.root); top.title('权限管理'); top.geometry('1000x500')
         top.configure(bg=CARD); top.grab_set()
         Label(top, text='权限管理', font=('Microsoft YaHei',12,'bold'), bg=CARD, fg=DARK).pack(anchor=W, padx=16, pady=(10,4))
         Label(top, text='点击复选框切换权限', font=('Microsoft YaHei',9), bg=CARD, fg='#888').pack(anchor=W, padx=16)
         
-        frame = Frame(top, bg=CARD)
-        frame.pack(fill=BOTH, expand=True, padx=16, pady=(4,8))
+        # Scrollable frame
+        canvas = Canvas(top, bg=CARD, highlightthickness=0)
+        vsb = Scrollbar(top, orient=VERTICAL, command=canvas.yview)
+        hsb = Scrollbar(top, orient=HORIZONTAL, command=canvas.xview)
+        canvas.configure(yscrollcommand=vsb.set, xscrollcommand=hsb.set)
+        
+        vsb.pack(side=RIGHT, fill=Y)
+        hsb.pack(side=BOTTOM, fill=X)
+        canvas.pack(side=LEFT, fill=BOTH, expand=True)
+        
+        frame = Frame(canvas, bg=CARD)
+        canvas.create_window((0, 0), window=frame, anchor='nw')
+        frame.bind('<Configure>', lambda e: canvas.configure(scrollregion=canvas.bbox('all')))
         
         users = get_users()
-        # Header row
-        Label(frame, text='用户', bg=CARD, fg=DARK, font=('Microsoft YaHei',9,'bold'), width=10, anchor='w').grid(row=0, column=0, padx=2, pady=2, sticky='w')
         perm_labels = [('record_add','添加记录'),('record_delete','删除记录'),('record_edit','编辑记录'),
                       ('material_manage','管理物料'),('worker_manage','管理工人'),('process_manage','管理工序'),
                       ('assignment_manage','工序分配'),('chart_view','查看图表'),('summary_view','查看汇总'),
                       ('export_excel','导出Excel'),('user_manage','用户管理')]
         perms = [p[0] for p in perm_labels]
-        for ci, (pk, pl) in enumerate(perm_labels, 1):
-            Label(frame, text=pl, bg=CARD, fg='#555', font=('Microsoft YaHei',8), width=8, anchor='w').grid(row=0, column=ci, padx=1)
         
+        # Header
+        Label(frame, text='用户', bg=CARD, fg=DARK, font=('Microsoft YaHei',9,'bold'),
+              width=10, anchor='w').grid(row=0, column=0, padx=4, pady=2, sticky='w')
+        for ci, (pk, pl) in enumerate(perm_labels, 1):
+            Label(frame, text=pl, bg=CARD, fg='#555', font=('Microsoft YaHei',8),
+                  width=7, anchor='w').grid(row=0, column=ci, padx=2, pady=2)
+        
+        # Permission checkboxes
         self._perm_vars = {}
         for ri, u in enumerate(users, 1):
             un = u['username']
-            Label(frame, text=un, bg=CARD, fg=DARK, font=('Microsoft YaHei',9), width=10, anchor='w').grid(row=ri, column=0, padx=2, pady=1, sticky='w')
+            Label(frame, text=un, bg=CARD, fg=DARK, font=('Microsoft YaHei',9),
+                  width=10, anchor='w').grid(row=ri, column=0, padx=4, pady=1, sticky='w')
             perms_dict = get_user_perms(un)
             for ci, pk in enumerate(perms, 1):
                 var = IntVar(value=perms_dict.get(pk, 0))
