@@ -1,0 +1,597 @@
+STRUCTURAL OVERVIEW of main.py
+
+[<module>] file=main.py line~1
+  Args: ()
+  Locals: ()
+  Globals referred: ('sqlite3', 'os', 'sys', 'webbrowser', 'tempfile', 'json', 'shutil', 'calendar', 'hashlib', 'secrets', 'datetime', 'date', 'timedelta', 'tkinter', 'ttk', 'messagebox', '_rp', 'getattr', 'path', 'dirname', 'executable', '_BASE', 'abspath', '__file__', 'join', 'DB_PATH', 'ECHARTS_PATH', 'chr', 'YEN', 'LOGIN_CRED_PATH', 'ALL_PERMS', '_set_placeholder', '_hash_pw', '_verify_pw', '_save_cred', '_load_cred', '_clear_cred', 'BG', 'CARD', 'PRIMARY', 'ACCENT', 'GREEN', 'RED', 'DARK', 'init_db', 'get_users', 'add_user', 'delete_user', 'update_user_pw', 'update_user_display', 'get_user_perms', 'set_user_perm', '_sync_mat_price', 'get_conn', 'get_materials', 'add_material', 'update_material', 'delete_material', 'get_workers', 'add_worker', 'update_worker', 'delete_worker', 'get_processes', 'add_process', 'update_process', 'delete_process', 'get_worker_processes', 'assign_worker_process', 'unassign_worker_process', 'add_record', 'update_record', 'delete_record', 'get_all_records', 'get_stats', 'list_months', '_chart_html', 'gen_report', 'export_excel', 'App', '__name__', 'run')
+  String constants: ["'frozen'", "'data.db'", "'echarts.min.js'", "'.login_cred'", "'#f0f2f5'", "'#ffffff'", "'#1a73e8'", "'#e67e22'", "'#27ae60'", "'#e74c3c'", "'#2c3e50'", "'App'", "'__main__'"]
+  [_rp] file=main.py line~8
+    Args: ('rel',)
+    Locals: ('sys', 'base')
+    Globals referred: ('sys', '_MEIPASS', 'os', 'path', 'dirname', 'abspath', '__file__', 'join')
+    String constants: []
+  [_set_placeholder] file=main.py line~23
+    Args: ('entry', 'text')
+    Locals: ('_in', '_out')
+    Globals referred: ('_ph_text', 'insert', 'config', 'bind')
+    String constants: ["'#999999'", "'<FocusIn>'", "'+'", "'<FocusOut>'"]
+    [_in] file=main.py line~27
+      Args: ('e',)
+      Locals: ()
+      Globals referred: ('get', '_ph_text', 'delete', 'END', 'config')
+      String constants: ["'#333333'"]
+    [_out] file=main.py line~29
+      Args: ('e',)
+      Locals: ()
+      Globals referred: ('get', 'strip', 'insert', '_ph_text', 'config')
+      String constants: ["'#999999'"]
+  [_hash_pw] file=main.py line~34
+    Args: ('pw',)
+    Locals: ('salt', 'h')
+    Globals referred: ('secrets', 'token_hex', 'hashlib', 'pbkdf2_hmac', 'encode', 'hex')
+    String constants: ["'sha256'", "'utf-8'"]
+  [_verify_pw] file=main.py line~39
+    Args: ('pw', 'stored')
+    Locals: ('salt', 'h')
+    Globals referred: ('hashlib', 'pbkdf2_hmac', 'encode', 'hex')
+    String constants: ["'sha256'", "'utf-8'"]
+  [_save_cred] file=main.py line~44
+    Args: ('un', 'pw')
+    Locals: ('base64', 'data', 'f')
+    Globals referred: ('base64', 'json', 'dumps', 'b64encode', 'encode', 'decode', 'open', 'LOGIN_CRED_PATH', 'write')
+    String constants: ["'u'", "'p'", "'w'"]
+  [_load_cred] file=main.py line~51
+    Args: ()
+    Locals: ('base64', 'd')
+    Globals referred: ('base64', 'json', 'loads', 'open', 'LOGIN_CRED_PATH', 'read', 'b64decode', 'decode')
+    String constants: ["'p'"]
+  [_clear_cred] file=main.py line~59
+    Args: ()
+    Locals: ()
+    Globals referred: ('os', 'path', 'exists', 'LOGIN_CRED_PATH', 'remove')
+    String constants: []
+  [init_db] file=main.py line~68
+    Args: ()
+    Locals: ('conn', 'c', 'pw', 'pk', 'seeded')
+    Globals referred: ('sqlite3', 'connect', 'DB_PATH', 'cursor', 'execute', 'fetchone', '_hash_pw', 'ALL_PERMS', 'executemany', 'commit', 'close')
+    String constants: ["'CREATE TABLE IF NOT EXISTS materials (id INTEGER PRIMARY KEY AUTOINCREMENT,name TEXT NOT NULL UNIQUE,price REAL DEFAULT 0)'", "'ALTER TABLE materials ADD COLUMN price REAL DEFAULT 0'", "'UPDATE materials SET price=5.0 WHERE price IS NULL'", '"CREATE TABLE IF NOT EXISTS workers (id INTEGER PRIMARY KEY AUTOINCREMENT,name TEXT NOT NULL UNIQUE,group_name TEXT NOT NULL DEFAULT \'\')"', '"ALTER TABLE workers ADD COLUMN group_name TEXT NOT NULL DEFAULT \'\'"', "'CREATE TABLE IF NOT EXISTS processes (id INTEGER PRIMARY KEY AUTOINCREMENT,material TEXT NOT NULL,process_name TEXT NOT NULL,unit_price REAL NOT NULL DEFAULT 0,UNIQUE(material,process_name))'", "'CREATE TABLE IF NOT EXISTS worker_processes (id INTEGER PRIMARY KEY AUTOINCREMENT,worker_id INTEGER NOT NULL,process_id INTEGER NOT NULL,UNIQUE(worker_id,process_id))'", '"CREATE TABLE IF NOT EXISTS records (id INTEGER PRIMARY KEY AUTOINCREMENT,worker_id INTEGER NOT NULL DEFAULT 0,process_id INTEGER NOT NULL DEFAULT 0,quantity REAL NOT NULL,unit_price REAL NOT NULL,record_date TEXT NOT NULL,created_at TEXT DEFAULT (datetime(\'now\',\'localtime\')))"', "'ALTER TABLE records ADD COLUMN worker_id INTEGER'", '"CREATE TABLE IF NOT EXISTS users (id INTEGER PRIMARY KEY AUTOINCREMENT,username TEXT NOT NULL UNIQUE,password_hash TEXT NOT NULL,display_name TEXT NOT NULL DEFAULT \'\',role TEXT NOT NULL DEFAULT \'worker\',created_at TEXT DEFAULT (datetime(\'now\',\'localtime\')))"', "'CREATE TABLE IF NOT EXISTS user_permissions (id INTEGER PRIMARY KEY AUTOINCREMENT,username TEXT NOT NULL,perm_key TEXT NOT NULL,allowed INTEGER NOT NULL DEFAULT 0,UNIQUE(username,perm_key))'", "'SELECT COUNT(*) FROM users'", "'admin123'", "'INSERT INTO users (username,password_hash,display_name,role) VALUES (?,?,?,?)'", "'admin'", "'系统管理员'", "'INSERT OR IGNORE INTO user_permissions (username,perm_key,allowed) VALUES (?,?,1)'", "'CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value TEXT)'", "'SELECT value FROM settings WHERE key=?'", "'INSERT INTO workers (name,group_name) VALUES (?,?)'"]
+  [get_users] file=main.py line~107
+    Args: ()
+    Locals: ('conn', 'rows', 'r')
+    Globals referred: ('get_conn', 'execute', 'fetchall', 'close', 'dict')
+    String constants: ["'SELECT * FROM users ORDER BY id'"]
+  [add_user] file=main.py line~111
+    Args: ('un', 'pw', 'dn', 'role')
+    Locals: ('conn', 'h', 'pk')
+    Globals referred: ('get_conn', '_hash_pw', 'execute', 'ALL_PERMS', 'commit', 'close')
+    String constants: ["'INSERT INTO users (username,password_hash,display_name,role) VALUES (?,?,?,?)'", "'INSERT OR IGNORE INTO user_permissions (username,perm_key,allowed) VALUES (?,?,0)'"]
+  [delete_user] file=main.py line~121
+    Args: ('un',)
+    Locals: ('conn',)
+    Globals referred: ('get_conn', 'execute', 'commit', 'close')
+    String constants: ["'DELETE FROM user_permissions WHERE username=?'", "'DELETE FROM users WHERE username=?'"]
+  [update_user_pw] file=main.py line~127
+    Args: ('un', 'pw')
+    Locals: ('conn', 'h')
+    Globals referred: ('get_conn', '_hash_pw', 'execute', 'commit', 'close')
+    String constants: ["'UPDATE users SET password_hash=? WHERE username=?'"]
+  [update_user_display] file=main.py line~132
+    Args: ('un', 'dn', 'role')
+    Locals: ('conn',)
+    Globals referred: ('get_conn', 'execute', 'commit', 'close')
+    String constants: ["'UPDATE users SET display_name=?,role=? WHERE username=?'"]
+  [get_user_perms] file=main.py line~137
+    Args: ('un',)
+    Locals: ('conn', 'rows', 'r')
+    Globals referred: ('get_conn', 'execute', 'fetchall', 'close', 'dict')
+    String constants: ["'SELECT * FROM user_permissions WHERE username=? ORDER BY perm_key'"]
+  [set_user_perm] file=main.py line~141
+    Args: ('un', 'pk', 'val')
+    Locals: ('conn',)
+    Globals referred: ('get_conn', 'execute', 'int', 'commit', 'close')
+    String constants: ["'INSERT OR REPLACE INTO user_permissions (username,perm_key,allowed) VALUES (?,?,?)'"]
+  [_sync_mat_price] file=main.py line~146
+    Args: ('material',)
+    Locals: ('conn', 'r', 'min_p')
+    Globals referred: ('get_conn', 'execute', 'fetchone', 'commit', 'close')
+    String constants: ["'SELECT SUM(unit_price) FROM processes WHERE material=?'", "'UPDATE materials SET price=? WHERE name=?'"]
+  [get_conn] file=main.py line~153
+    Args: ()
+    Locals: ('conn',)
+    Globals referred: ('sqlite3', 'connect', 'DB_PATH', 'Row', 'row_factory')
+    String constants: []
+  [get_materials] file=main.py line~156
+    Args: ()
+    Locals: ('conn', 'rows', 'r')
+    Globals referred: ('get_conn', 'execute', 'fetchall', 'close', 'dict')
+    String constants: ["'SELECT * FROM materials ORDER BY name'"]
+  [add_material] file=main.py line~160
+    Args: ('name', 'price')
+    Locals: ('conn',)
+    Globals referred: ('get_conn', 'execute', 'commit', 'close')
+    String constants: ["'INSERT OR IGNORE INTO materials (name,price) VALUES (?,?)'"]
+  [update_material] file=main.py line~163
+    Args: ('old_name', 'new_name', 'price')
+    Locals: ('conn',)
+    Globals referred: ('get_conn', 'execute', 'commit', 'close')
+    String constants: ["'UPDATE materials SET name=?,price=? WHERE name=?'", "'UPDATE processes SET material=? WHERE material=?'"]
+  [delete_material] file=main.py line~169
+    Args: ('name',)
+    Locals: ('conn',)
+    Globals referred: ('get_conn', 'execute', 'commit', 'close')
+    String constants: ["'DELETE FROM records WHERE process_id IN (SELECT id FROM processes WHERE material=?)'", "'DELETE FROM worker_processes WHERE process_id IN (SELECT id FROM processes WHERE material=?)'", "'DELETE FROM processes WHERE material=?'", "'DELETE FROM materials WHERE name=?'"]
+  [get_workers] file=main.py line~177
+    Args: ()
+    Locals: ('conn', 'rows', 'r')
+    Globals referred: ('get_conn', 'execute', 'fetchall', 'close', 'dict')
+    String constants: ["'SELECT * FROM workers ORDER BY group_name, name'"]
+  [add_worker] file=main.py line~181
+    Args: ('name', 'group_name')
+    Locals: ('conn',)
+    Globals referred: ('get_conn', 'execute', 'commit', 'close')
+    String constants: ["'INSERT INTO workers (name,group_name) VALUES (?,?)'"]
+  [update_worker] file=main.py line~184
+    Args: ('oid', 'name', 'group_name')
+    Locals: ('conn',)
+    Globals referred: ('get_conn', 'execute', 'commit', 'close')
+    String constants: ["'UPDATE workers SET name=?,group_name=? WHERE id=?'"]
+  [delete_worker] file=main.py line~187
+    Args: ('oid',)
+    Locals: ('conn',)
+    Globals referred: ('get_conn', 'execute', 'commit', 'close')
+    String constants: ["'DELETE FROM worker_processes WHERE worker_id=?'", "'DELETE FROM workers WHERE id=?'"]
+  [get_processes] file=main.py line~193
+    Args: ('material',)
+    Locals: ('conn', 'rows', 'r')
+    Globals referred: ('get_conn', 'execute', 'fetchall', 'close', 'dict')
+    String constants: ["'SELECT * FROM processes WHERE material=? ORDER BY id'", "'SELECT * FROM processes ORDER BY material, id'"]
+  [add_process] file=main.py line~200
+    Args: ('material', 'process_name', 'unit_price')
+    Locals: ('conn',)
+    Globals referred: ('get_conn', 'execute', 'commit', 'close')
+    String constants: ["'INSERT INTO processes (material,process_name,unit_price) VALUES (?,?,?)'"]
+  [update_process] file=main.py line~207
+    Args: ('pid', 'material', 'process_name', 'unit_price')
+    Locals: ('conn',)
+    Globals referred: ('get_conn', 'execute', 'commit', 'close')
+    String constants: ["'UPDATE processes SET material=?,process_name=?,unit_price=? WHERE id=?'"]
+  [delete_process] file=main.py line~210
+    Args: ('pid',)
+    Locals: ('conn',)
+    Globals referred: ('get_conn', 'execute', 'commit', 'close')
+    String constants: ["'DELETE FROM worker_processes WHERE process_id=?'", "'DELETE FROM processes WHERE id=?'"]
+  [get_worker_processes] file=main.py line~216
+    Args: ('worker_id',)
+    Locals: ('conn', 'rows', 'r')
+    Globals referred: ('get_conn', 'execute', 'fetchall', 'close', 'dict')
+    String constants: ["'SELECT wp.*,p.material,p.process_name,p.unit_price FROM worker_processes wp JOIN processes p ON wp.process_id=p.id WHERE wp.worker_id=? ORDER BY p.material,p.id'", "'SELECT wp.*,p.material,p.process_name,p.unit_price,w.name as worker_name FROM worker_processes wp JOIN processes p ON wp.process_id=p.id JOIN workers w ON wp.worker_id=w.id ORDER BY w.name,p.material'"]
+  [assign_worker_process] file=main.py line~225
+    Args: ('worker_id', 'process_id')
+    Locals: ('conn',)
+    Globals referred: ('get_conn', 'execute', 'commit', 'close')
+    String constants: ["'INSERT OR IGNORE INTO worker_processes (worker_id,process_id) VALUES (?,?)'"]
+  [unassign_worker_process] file=main.py line~232
+    Args: ('wp_id',)
+    Locals: ('conn',)
+    Globals referred: ('get_conn', 'execute', 'commit', 'close')
+    String constants: ["'DELETE FROM worker_processes WHERE id=?'"]
+  [add_record] file=main.py line~235
+    Args: ('worker_id', 'process_id', 'quantity', 'unit_price', 'record_date', 'rid')
+    Locals: ('conn',)
+    Globals referred: ('get_conn', 'execute', 'commit', 'close')
+    String constants: ["'INSERT INTO records (id,worker_id,process_id,quantity,unit_price,record_date) VALUES (?,?,?,?,?,?)'", "'INSERT INTO records (worker_id,process_id,quantity,unit_price,record_date) VALUES (?,?,?,?,?)'"]
+  [update_record] file=main.py line~243
+    Args: ('rid', 'worker_id', 'process_id', 'quantity', 'unit_price', 'record_date', 'new_id')
+    Locals: ('conn',)
+    Globals referred: ('get_conn', 'execute', 'commit', 'close')
+    String constants: ["'UPDATE records SET id=?,worker_id=?,process_id=?,quantity=?,unit_price=?,record_date=? WHERE id=?'", "'UPDATE records SET worker_id=?,process_id=?,quantity=?,unit_price=?,record_date=? WHERE id=?'"]
+  [delete_record] file=main.py line~251
+    Args: ('rid',)
+    Locals: ('conn',)
+    Globals referred: ('get_conn', 'execute', 'commit', 'close')
+    String constants: ["'DELETE FROM records WHERE id=?'"]
+  [get_all_records] file=main.py line~254
+    Args: ()
+    Locals: ('conn', 'rows', 'r')
+    Globals referred: ('get_conn', 'execute', 'fetchall', 'close', 'dict')
+    String constants: ["'SELECT r.*,w.name as worker_name,w.group_name,p.material,p.process_name FROM records r LEFT JOIN workers w ON r.worker_id=w.id LEFT JOIN processes p ON r.process_id=p.id ORDER BY r.record_date DESC, r.id DESC'"]
+  [get_stats] file=main.py line~260
+    Args: ('start_date', 'end_date', 'process_filter', 'worker_filter')
+    Locals: ('conn', 'wh', 'pa', 'ws', 'totals', 'by_worker', 'by_process', 'by_date', 'r')
+    Globals referred: ('get_conn', 'append', 'join', 'execute', 'fetchone', 'fetchall', 'close', 'dict')
+    String constants: ["'r.record_date >= ?'", "'r.record_date <= ?'", "'r.process_id=?'", "'r.worker_id=?'", "' WHERE '", "' AND '", "''", "'SELECT COUNT(*) AS r,COUNT(DISTINCT r.worker_id) AS w,COALESCE(SUM(r.quantity),0) AS q,COALESCE(SUM(r.quantity*r.unit_price),0) AS e FROM records r'", "'SELECT w.name as worker,w.group_name,SUM(r.quantity) AS q,SUM(r.quantity*r.unit_price) AS e,COUNT(*) AS c FROM records r JOIN workers w ON r.worker_id=w.id'", "' GROUP BY r.worker_id ORDER BY e DESC'", "'SELECT p.material,p.process_name,SUM(r.quantity) AS q,SUM(r.quantity*r.unit_price) AS e,COUNT(*) AS c FROM records r JOIN processes p ON r.process_id=p.id'", "' GROUP BY r.process_id ORDER BY q DESC'", "'SELECT r.record_date,SUM(r.quantity) AS q,SUM(r.quantity*r.unit_price) AS e,COUNT(*) AS c FROM records r'", "' GROUP BY r.record_date ORDER BY r.record_date'", "'totals'", "'by_worker'", "'by_process'", "'by_date'"]
+  [list_months] file=main.py line~275
+    Args: ()
+    Locals: ('conn', 'rows', 'r')
+    Globals referred: ('get_conn', 'execute', 'fetchall', 'close')
+    String constants: ["'SELECT DISTINCT substr(record_date,1,7) AS ym FROM records ORDER BY ym DESC'", "'ym'"]
+  [_chart_html] file=main.py line~279
+    Args: ('ttl', 'stats', 'records')
+    Locals: ('w', 'd', 'p', 't', 'wj', 'dj', 'pj', 'rj', 'yc', 'head', 'style', 'body', 'script')
+    Globals referred: ('json', 'dumps', 'YEN', 'str', 'date', 'today', 'round')
+    String constants: ["'by_worker'", "'by_date'", "'by_process'", "'totals'", '\'<!DOCTYPE html><html lang="zh-CN"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">\'', "'<title>'", '\'</title><script src="echarts.min.js"></script>\'', "''", "'*{margin:0;padding:0;box-sizing:border-box}'", '\'body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Noto Sans SC",sans-serif;background:#f0f2f5;color:#2c3e50}\'', "'.hd{background:linear-gradient(135deg,#1a73e8,#0d47a1);color:#fff;padding:20px 28px}'", "'.hd h1{font-size:18px}.hd p{font-size:12px;opacity:.8;margin-top:4px}'", "'.c{max-width:1200px;margin:0 auto;padding:16px 20px}'", "'.sr{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px;margin-bottom:16px}'", "'.sc{background:#fff;border-radius:8px;padding:14px 18px;box-shadow:0 1px 3px rgba(0,0,0,.06)}'", "'.sc .l{font-size:11px;color:#888}.sc .v{font-size:22px;font-weight:700;color:#2c3e50;margin-top:4px}'", "'.sc .v.g{color:#27ae60}.sc .v.o{color:#e67e22}'", "'.cc{background:#fff;border-radius:8px;padding:14px;box-shadow:0 1px 3px rgba(0,0,0,.06);margin-bottom:14px}'", "'.cc h3{font-size:13px;color:#555;margin-bottom:6px}'", "'.cb{width:100%;min-height:260px}'"]
+  [gen_report] file=main.py line~338
+    Args: ('title', 'stats', 'records')
+    Locals: ('html', 'safe', 'path', 'f')
+    Globals referred: ('_chart_html', 'replace', 'os', 'path', 'join', 'tempfile', 'gettempdir', 'open', 'write', 'exists', 'ECHARTS_PATH', 'shutil', 'copy2', 'webbrowser')
+    String constants: ["'/'", "'-'", "'\\\\'", "'.html'", "'w'", "'utf-8'", "'echarts.min.js'", "'file://'"]
+  [export_excel] file=main.py line~346
+    Args: ('data_groups', 'path', 'process_filter_name')
+    Locals: ('Workbook', 'Font', 'PatternFill', 'Alignment', 'Border', 'Side', 'wb', 'hf', 'hfl', 'ttf', 'tb', 'gk', 'items', 'ws', 'fl', 'ci', 'h', 'c', 'tq', 'tw', 'ri', 'item', 'wg', 'lr', 'col', 'w')
+    Globals referred: ('openpyxl', 'Workbook', 'openpyxl.styles', 'Font', 'PatternFill', 'Alignment', 'Border', 'Side', 'remove', 'active', 'sorted', 'keys', 'create_sheet', 'str', 'cell', 'font', 'merge_cells', 'enumerate', 'fill', 'alignment', 'border', 'get', 'round', 'len', 'range', 'column_dimensions', 'width', 'save')
+    String constants: ["'ffffff'", "'1a73e8'", "'solid'", "'thin'", "'ccc'", "'（工序筛选：'", "'）'", "''", "'生产记录 - '", "'center'", "'material'", "'process_name'", "'worker_name'", "'group_name'", "'quantity'", "'unit_price'", "'合计'", "'e67e22'"]
+  [App] file=main.py line~381
+    Args: ()
+    Locals: ()
+    Globals referred: ('__name__', '__module__', '__qualname__', '__firstlineno__', '__init__', '_show_login', '_check_perm', '_apply_permissions', '_build_ui', '_on_worker_select', '_on_process_select', '_add_record', '_refresh', '_on_double_click', '_delete_selected', '_edit_record_dialog', '_open_chart', '_pick_month', '_on_click', '_manage_materials', '_manage_workers', '_assign_materials', '_manage_processes', '_manage_users', '_manage_permissions', '_summary_page', '_show_calendar', '_msg', 'run', '__static_attributes__', '__classdictcell__')
+    String constants: ["'App'"]
+    [__init__] file=main.py line~382
+      Args: ('self',)
+      Locals: ()
+      Globals referred: ('Tk', 'root', 'title', 'geometry', 'minsize', 'configure', 'BG', 'ttk', 'Style', 'theme_use', 'theme_names', 'current_user', 'withdraw', '_show_login')
+      String constants: ["'生产管理系统'", "'1100x760'", "'vista'", "'clam'"]
+    [_show_login] file=main.py line~393
+      Args: ('self',)
+      Locals: ('sw', 'sh', 'x', 'y', 'f', 'rf', 'cred')
+      Globals referred: ('Toplevel', 'root', 'title', 'geometry', 'configure', 'CARD', 'resizable', 'grab_set', 'protocol', 'update_idletasks', 'winfo_screenwidth', 'winfo_screenheight', 'Label', 'PRIMARY', 'pack', 'Frame', 'grid', 'W', 'Entry', 'IntVar', 'Checkbutton', 'LEFT', '_load_cred', 'insert', 'get', 'set', 'RED', 'bind', 'Button', 'ACCENT', 'focus')
+      String constants: ["'登录'", "'340x280'", "'WM_DELETE_WINDOW'", "'+'", "'生产管理系统 登录'", "'请输入帐号密码'", "'#888'", "'用户名：'", "'solid'", "'密码：'", "'*'", "'记住密码'", "'u'", "''", "'p'", "'<Return>'", "'white'", "'flat'", "'hand2'", "'默认帐号：admin / admin123'"]
+      [<lambda>] file=main.py line~397
+        Args: ()
+        Locals: ()
+        Globals referred: ('root', 'destroy', 'sys', 'exit')
+        String constants: []
+      [do_login] file=main.py line~420
+        Args: ()
+        Locals: ('un', 'pw', 'conn', 'r')
+        Globals referred: ('get', 'strip', 'config', 'get_conn', 'execute', 'fetchone', 'close', 'dict', '_verify_pw', 'current_user', '_save_cred', '_clear_cred', '_build_ui', '_refresh', '_apply_permissions', 'root', 'deiconify', 'destroy')
+        String constants: ["'请输入用户名和密码'", "'SELECT * FROM users WHERE username=?'", "'用户名不存在'", "'password_hash'", "'密码错误'"]
+      [<lambda>] file=main.py line~435
+        Args: ('e',)
+        Locals: ()
+        Globals referred: ('focus',)
+        String constants: []
+      [<lambda>] file=main.py line~436
+        Args: ('e',)
+        Locals: ()
+        Globals referred: ()
+        String constants: []
+    [_check_perm] file=main.py line~441
+      Args: ('self', 'key')
+      Locals: ('conn', 'r')
+      Globals referred: ('current_user', 'get_conn', 'execute', 'fetchone', 'close')
+      String constants: ["'role'", "'admin'", "'SELECT allowed FROM user_permissions WHERE username=? AND perm_key=?'", "'username'", "'allowed'"]
+    [_apply_permissions] file=main.py line~449
+      Args: ('self',)
+      Locals: ('pm', 'pk', 'k', 'btn')
+      Globals referred: ('_manage_materials', '_manage_workers', '_manage_processes', '_summary_page', '_open_chart', '_pick_month', '_manage_users', '_manage_permissions', 'hasattr', 'getattr', 'current_user', 'pack', 'LEFT', 'pack_forget')
+      String constants: ["'管理物料'", "'管理工人'", "'管理工序'", "'汇总查询'", "'生成图表报告'", "'生成月度汇总'", "'用户管理'", "'权限管理'", "'material_manage'", "'worker_manage'", "'process_manage'", "'summary_view'", "'chart_view'", "'user_manage'", "'_btn_'", "'role'", "'admin'"]
+    [_build_ui] file=main.py line~470
+      Args: ('self',)
+      Locals: ('hdr', 'main', 'fm', 'row', 'fi', 'fw', 'fp', 'fq', 'fd', 'df', 'fc', '_uc', 'bf', 'btnf', 'btns', 'txt', 'cmd', 'sf', 'key', 'f', 'lb', 'tf', 'cols', 'hd', 'wd', 'c', 'vsb', 'hsb', 'bt')
+      Globals referred: ('Frame', 'root', 'PRIMARY', 'pack', 'X', 'pack_propagate', 'Label', 'W', 'BG', 'BOTH', 'CARD', 'DARK', 'LEFT', 'Entry', 'CENTER', 'e_id', '_set_placeholder', 'ttk', 'Combobox', 'cb_worker', 'bind', '_on_worker_select', 'cb_process', '_on_process_select', 'e_qty', 'e_date', 'insert', 'date', 'today', 'isoformat', 'config', 'Button', '_show_calendar', 'YEN', 'ACCENT', 'lbl_calc', '_cur_price', '_add_record', '_manage_materials', '_manage_workers', '_manage_processes', '_summary_page', '_manage_users', '_btn_users', '_manage_permissions', '_btn_perms', 'sl', 'Treeview', 'tr', 'heading', 'column', 'Scrollbar', 'VERTICAL', 'yview', 'HORIZONTAL', 'xview', 'configure', 'set', 'RIGHT', 'Y', 'BOTTOM', 'msg', 'RED', '_delete_selected', '_pick_month', '_open_chart')
+      String constants: ["'生产记录管理系统'", "'white'", "'工人 · 工序 · 产量 · 工资 · 动态图表'", "'#b0c4de'", "'#ddd'", "'添加记录'", "'ID'", "'#666'", "'solid'", "'留空自动'", "'选择工人'", "'readonly'", "'<<ComboboxSelected>>'", "'选择工序'", "'件数'", "'日期'", "'▼'", "''", "'flat'", "'hand2'"]
+      [_uc] file=main.py line~505
+        Args: ('e',)
+        Locals: ('q', 'p')
+        Globals referred: ('float', 'e_qty', 'get', 'strip', 'getattr', 'lbl_calc', 'config', 'YEN', 'format')
+        String constants: ["'_cur_price'", "'{:.2f}'"]
+    [_on_worker_select] file=main.py line~550
+      Args: ('self', 'e')
+      Locals: ('w', 'wid', 'ww', 'assigned', 'a', 'opts')
+      Globals referred: ('cb_worker', 'get', 'get_workers', 'get_worker_processes', 'cb_process', 'set', '_on_process_select', '_cur_price', 'lbl_calc', 'config', 'YEN')
+      String constants: ["'name'", "'('", "'group_name'", "')'", "'id'", "'material'", "' - '", "'process_name'", "'values'", "''", "'0.00'"]
+    [_on_process_select] file=main.py line~564
+      Args: ('self', 'e')
+      Locals: ('sel', 'w', 'wid', 'ww', 'a')
+      Globals referred: ('cb_process', 'get', 'cb_worker', 'get_workers', 'get_worker_processes', '_cur_price', 'lbl_calc', 'config', 'YEN')
+      String constants: ["'name'", "'('", "'group_name'", "')'", "'id'", "'material'", "' - '", "'process_name'", "'unit_price'", "'0.00'"]
+    [_add_record] file=main.py line~575
+      Args: ('self',)
+      Locals: ('w', 'p', 'qty', 'wid', 'pid', 'price', 'ww', 'a', 'dt')
+      Globals referred: ('cb_worker', 'get', 'cb_process', '_msg', 'RED', 'float', 'e_qty', 'strip', 'get_workers', 'get_worker_processes', 'e_date', 'date', 'today', 'isoformat', 'add_record', 'GREEN', 'delete', 'END', 'lbl_calc', 'config', 'YEN', '_refresh')
+      String constants: ["'请选择工人和工序'", "'件数必须是数字'", "'件数必须大于0'", "'name'", "'('", "'group_name'", "')'", "'id'", "'material'", "' - '", "'process_name'", "'process_id'", "'unit_price'", "'数据异常'", "'已添加：'", "' '", "'件'", "'0.00'"]
+    [_refresh] file=main.py line~595
+      Args: ('self',)
+      Locals: ('records', 'stats', 't', 'item', 'r', 'wg', 'w')
+      Globals referred: ('get_all_records', 'get_stats', 'sl', 'config', 'str', 'round', 'YEN', 'ACCENT', 'tr', 'get_children', 'delete', 'insert', 'END', 'bind', '_on_double_click', 'get_workers', 'cb_worker')
+      String constants: ["'totals'", "'w'", "'q'", "'e'", "'r'", "'quantity'", "'unit_price'", "''", "'id'", "'material'", "'process_name'", "'worker_name'", "'group_name'", "'record_date'", "'<Double-1>'", "'name'", "'('", "')'", "'values'"]
+    [_on_double_click] file=main.py line~609
+      Args: ('self', 'ev')
+      Locals: ('sel', 'rid')
+      Globals referred: ('tr', 'selection', 'focus', 'item', '_edit_record_dialog')
+      String constants: ["'values'"]
+    [_delete_selected] file=main.py line~616
+      Args: ('self',)
+      Locals: ('sel', 'item')
+      Globals referred: ('tr', 'focus_set', 'selection', 'focus', '_msg', 'RED', 'item', 'messagebox', 'askyesno', 'str', 'delete_record', '_refresh')
+      String constants: ["'请先点击选中要删除的记录'", "'values'", "'确认删除'", "'确定删除 '", "' 的记录？'"]
+    [_edit_record_dialog] file=main.py line~625
+      Args: ('self', 'rid')
+      Locals: ('records', 'r', 'id_f', 'pf', 'w', 'w_opts', '_oc', 'save')
+      Globals referred: ('get_all_records', 'Toplevel', 'root', 'title', 'geometry', 'configure', 'CARD', 'grab_set', 'Frame', 'pack', 'X', 'Label', 'LEFT', 'Entry', 'insert', 'str', 'get_workers', 'grid', 'W', 'ttk', 'Combobox', 'set', 'bind', 'Button', 'ACCENT')
+      String constants: ["'id'", "'编辑记录'", "'420x320'", "'ID:'", "'solid'", "'name'", "'('", "'group_name'", "')'", "'工人:'", "'readonly'", "'worker_name'", "'工序:'", "'<<ComboboxSelected>>'", "'件数:'", "'quantity'", "'日期:'", "'record_date'", "'保存'", "'white'"]
+      [_oc] file=main.py line~644
+        Args: ('e',)
+        Locals: ('w', 'wid', 'ww', 'a', 'opts')
+        Globals referred: ('get', 'get_worker_processes', 'set')
+        String constants: ["'name'", "'('", "'group_name'", "')'", "'id'", "'material'", "' - '", "'process_name'", "'values'", "''"]
+      [save] file=main.py line~656
+        Args: ()
+        Locals: ('q', 'w', 'p', 'wid', 'pid', 'price', 'ww', 'a', 'new_id_str', 'new_id', 'ex')
+        Globals referred: ('float', 'get', 'strip', 'get_worker_processes', 'messagebox', 'showinfo', 'str', 'int', 'update_record', 'date', 'today', 'isoformat', 'destroy', '_refresh', 'Exception', 'showerror')
+        String constants: ["'name'", "'('", "'group_name'", "')'", "'id'", "'material'", "' - '", "'process_name'", "'process_id'", "'unit_price'", "'错误'", "'工人或工序无效'"]
+    [_open_chart] file=main.py line~673
+      Args: ('self',)
+      Locals: ('stats',)
+      Globals referred: ('get_stats', '_msg', 'RED', 'gen_report', 'get_all_records')
+      String constants: ["'totals'", "'r'", "'暂无数据'", "'生产报表'"]
+    [_pick_month] file=main.py line~678
+      Args: ('self',)
+      Locals: ('m',)
+      Globals referred: ('list_months', '_msg', 'RED', 'Toplevel', 'root', 'title', 'geometry', 'configure', 'CARD', 'grab_set', 'Label', 'pack', 'Listbox', 'CENTER', 'insert', 'END', 'BOTH', 'bind', 'Button', 'ACCENT')
+      String constants: ["'暂无数据'", "'选择月份'", "'280x200'", "'选择要生成汇总的月份：'", "'solid'", "'<Double-1>'", "'生成此月汇总'", "'white'", "'flat'", "'hand2'"]
+      [<lambda>] file=main.py line~687
+        Args: ('e',)
+        Locals: ()
+        Globals referred: ()
+        String constants: []
+      [do] file=main.py line~688
+        Args: ()
+        Locals: ('sel', 'ym', 'stats', 'conn', 'rows', 'r', 'ex')
+        Globals referred: ('curselection', 'messagebox', 'showinfo', 'get_stats', 'get_conn', 'execute', 'fetchall', 'close', 'gen_report', 'dict', 'destroy', 'Exception', 'showerror', 'str')
+        String constants: ["'提示'", "'请先选择一个月份'", "'-01'", "'-31'", "'SELECT r.*,w.name as worker_name,w.group_name,p.material,p.process_name FROM records r LEFT JOIN workers w ON r.worker_id=w.id LEFT JOIN processes p ON r.process_id=p.id WHERE r.record_date LIKE ? ORDER BY r.record_date'", "'%'", "' 月度汇总'", "'错误'"]
+    [_on_click] file=main.py line~702
+      Args: ('self', 'ev')
+      Locals: ('sel', 'item')
+      Globals referred: ('tr', 'selection', 'item', 'messagebox', 'askyesno', 'str', 'delete_record', '_refresh')
+      String constants: ["'values'", "'确认删除'", "'确定删除 '", "' 的记录？'"]
+    [_manage_materials] file=main.py line~709
+      Args: ('self',)
+      Locals: ('m', 'f', 'do_add', 'do_edit', 'do_del')
+      Globals referred: ('Toplevel', 'root', 'title', 'geometry', 'configure', 'CARD', 'grab_set', 'protocol', 'Label', 'DARK', 'pack', 'W', 'ttk', 'Treeview', 'heading', 'column', 'E', 'get_materials', 'insert', 'END', 'str', 'get', 'BOTH', '_tr', 'Frame', 'X', 'Entry', 'LEFT', '_set_placeholder', 'Button', 'ACCENT', '_assign_materials', 'RED')
+      String constants: ["'管理物料'", "'520x400'", "'WM_DELETE_WINDOW'", "'物料列表'", "'name'", "'price'", "'headings'", "'物料名称'", "'工序总价(元)'", "''", "'0'", "'solid'", "'添加'", "'white'", "'flat'", "'hand2'", "'编辑'", "'#2980b9'", "'分配物料'", "'#8e44ad'"]
+      [<lambda>] file=main.py line~712
+        Args: ()
+        Locals: ()
+        Globals referred: ('_refresh', 'destroy')
+        String constants: []
+      [do_add] file=main.py line~724
+        Args: ()
+        Locals: ('n',)
+        Globals referred: ('get', 'strip', 'getattr', 'add_material', 'insert', 'END', 'delete')
+        String constants: ["'_ph_text'", "''", "'0'"]
+      [do_edit] file=main.py line~730
+        Args: ()
+        Locals: ('vals', 'f2', 'save')
+        Globals referred: ('focus_set', 'selection', 'focus', '_msg', 'RED', 'item', 'Toplevel', 'title', 'geometry', 'configure', 'CARD', 'transient', 'grab_set', 'Frame', 'pack', 'Label', 'grid', 'W', 'Entry', 'insert', 'Button', 'ACCENT')
+        String constants: ["'请先点击选中要编辑的物料'", "'values'", "'编辑物料'", "'280x120'", "'名称:'", "'保存'", "'white'", "'flat'", "'hand2'"]
+        [save] file=main.py line~741
+          Args: ()
+          Locals: ('nn',)
+          Globals referred: ('get', 'strip', 'update_material', 'item', 'str', 'destroy')
+          String constants: []
+      [do_del] file=main.py line~747
+        Args: ()
+        Locals: ('sel', 'n')
+        Globals referred: ('focus_set', 'selection', 'focus', '_msg', 'RED', 'item', 'messagebox', 'askyesno', 'delete_material', 'delete')
+        String constants: ["'请先点击选中要删除的物料'", "'values'", "'确认删除'", "'确定删除 '", "' ？(关联的工序也将被删除)'"]
+    [_manage_workers] file=main.py line~758
+      Args: ('self',)
+      Locals: ('w', 'f', 'do_add', 'do_edit', 'do_del')
+      Globals referred: ('Toplevel', 'root', 'title', 'geometry', 'configure', 'CARD', 'grab_set', 'protocol', 'Label', 'DARK', 'pack', 'W', 'ttk', 'Treeview', 'heading', 'column', 'get_workers', 'insert', 'END', 'BOTH', '_tr', 'Frame', 'X', 'Entry', 'LEFT', '_set_placeholder', 'Button', 'ACCENT', '_assign_materials', 'RED')
+      String constants: ["'管理工人'", "'520x400'", "'WM_DELETE_WINDOW'", "'工人列表'", "'name'", "'group'", "'headings'", "'姓名'", "'组别'", "''", "'group_name'", "'solid'", "'添加'", "'white'", "'flat'", "'hand2'", "'编辑'", "'#2980b9'", "'分配物料'", "'#8e44ad'"]
+      [<lambda>] file=main.py line~761
+        Args: ()
+        Locals: ()
+        Globals referred: ('_refresh', 'destroy')
+        String constants: []
+      [do_add] file=main.py line~774
+        Args: ()
+        Locals: ('n', 'g')
+        Globals referred: ('get', 'strip', 'getattr', 'add_worker', 'insert', 'END', 'delete')
+        String constants: ["'_ph_text'", "''"]
+      [do_edit] file=main.py line~781
+        Args: ()
+        Locals: ('vals', 'w', 'f2', 'save')
+        Globals referred: ('selection', 'item', 'get_workers', 'Toplevel', 'title', 'geometry', 'configure', 'CARD', 'transient', 'grab_set', 'Frame', 'pack', 'Label', 'grid', 'W', 'Entry', 'insert', 'Button', 'ACCENT')
+        String constants: ["'values'", "'name'", "'id'", "'编辑工人'", "'300x150'", "'姓名:'", "'组别:'", "'保存'", "'white'", "'flat'", "'hand2'"]
+        [save] file=main.py line~795
+          Args: ()
+          Locals: ()
+          Globals referred: ('update_worker', 'get', 'strip', 'item', 'destroy')
+          String constants: []
+      [do_del] file=main.py line~800
+        Args: ()
+        Locals: ('sel', 'n', 'w')
+        Globals referred: ('selection', 'item', 'messagebox', 'askyesno', 'get_workers', 'delete_worker', 'delete')
+        String constants: ["'values'", "'确认删除'", "'确定删除 '", "' ？'", "'name'", "'id'"]
+    [_assign_materials] file=main.py line~811
+      Args: ('self',)
+      Locals: ('w', 'top', 'tr', 'child', 'sub', 's', 'sel', 'vals', 'wname', 'assigned', 'assigned_mats', 'a', 'all_mats', 'm', 'checked', 'bf', 'save_mats')
+      Globals referred: ('root', 'winfo_children', 'isinstance', 'Toplevel', 'title', 'messagebox', 'showinfo', 'ttk', 'Treeview', 'hasattr', 'selection', 'focus', 'item', 'get_workers', 'geometry', 'configure', 'CARD', 'transient', 'grab_set', 'Label', 'DARK', 'pack', 'heading', 'column', 'CENTER', 'get_worker_processes', 'set', 'add', 'get_materials', 'insert', 'END', 'BOTH', 'bind', 'Frame', 'X', 'Button', 'PRIMARY', 'LEFT', 'ACCENT', 'RIGHT')
+      String constants: ["'管理工人'", "'提示'", "'请先打开管理工人窗口'", "'winfo_children'", "'未找到工人列表'", "'请先选择一个工人'", "'values'", "'name'", "'id'", "'工人数据异常'", "'分配物料 - '", "'350x400'", "'为 '", "' 选择可做的物料（双击切换）'", "'sel'", "'headings'", "'选中'", "'物料名称'", "'material'", "'✓'"]
+      [toggle_mat] file=main.py line~887
+        Args: ()
+        Locals: ('sm', 'cur')
+        Globals referred: ('selection', 'set')
+        String constants: ["'sel'", "'✓'", "''"]
+      [<lambda>] file=main.py line~894
+        Args: ('e',)
+        Locals: ()
+        Globals referred: ()
+        String constants: []
+      [save_mats] file=main.py line~901
+        Args: ()
+        Locals: ('existing', 'e', 'all_procs', 'changed', 'item', 'vals_item', 'mat_name', 'p')
+        Globals referred: ('get_worker_processes', 'unassign_worker_process', 'get_processes', 'get_children', 'item', 'assign_worker_process', '_msg', 'GREEN', 'destroy')
+        String constants: ["'id'", "'values'", "'✓'", "'material'", "'物料分配已保存'"]
+    [_manage_processes] file=main.py line~925
+      Args: ('self',)
+      Locals: ('nb', 'pf', 'p', 'f', 'mats', 'm', 'do_ap', 'do_ep', 'do_dp', 'af', 'mid', 'left', 'w', 'right', 'tf', 'vsb2')
+      Globals referred: ('Toplevel', 'root', 'title', 'geometry', 'configure', 'CARD', 'grab_set', 'ttk', 'Notebook', 'pack', 'BOTH', 'Frame', 'add', 'Label', 'W', 'Treeview', 'heading', 'column', 'E', 'get_processes', 'insert', 'END', 'str', 'X', 'get_materials', 'Combobox', 'set', 'LEFT', 'Entry', '_set_placeholder', 'Button', 'ACCENT', 'RED', 'Y', 'DARK', 'Listbox', 'get_workers', 'bind', 'RIGHT', 'CENTER', 'Scrollbar', 'VERTICAL', 'yview', 'PRIMARY')
+      String constants: ["'管理工序'", "'620x500'", "'工序管理'", "'所有工序（每个物料可设置多个工序，各有独立单价）'", "'#666'", "'material'", "'name'", "'price'", "'headings'", "'所属物料'", "'工序名称'", "'单价(元)'", "''", "'process_name'", "'unit_price'", "'readonly'", "'选择物料'", "'solid'", "'单价'", "'添加工序'"]
+      [do_ap] file=main.py line~943
+        Args: ()
+        Locals: ('m', 'pn', 'ppv', 'pp')
+        Globals referred: ('get', 'strip', 'getattr', 'float', 'add_process', 'insert', 'END', 'str', '_sync_mat_price', 'delete', 'messagebox', 'showinfo')
+        String constants: ["'_ph_text'", "''", "'选择物料'", "'提示'", "'该物料下已存在同名工序'"]
+      [do_ep] file=main.py line~955
+        Args: ()
+        Locals: ('vals', 'p', 'f2', 'save')
+        Globals referred: ('selection', 'item', 'get_processes', 'Toplevel', 'title', 'geometry', 'configure', 'CARD', 'transient', 'grab_set', 'Frame', 'pack', 'Label', 'grid', 'W', 'ttk', 'Combobox', 'set', 'Entry', 'insert', 'str', 'Button', 'ACCENT')
+        String constants: ["'values'", "'material'", "'process_name'", "'id'", "'编辑工序'", "'320x180'", "'物料:'", "'readonly'", "'名称:'", "'单价:'", "'保存'", "'white'", "'flat'", "'hand2'"]
+        [save] file=main.py line~970
+          Args: ()
+          Locals: ('pp',)
+          Globals referred: ('float', 'get', 'strip', 'update_process', 'item', 'str', '_sync_mat_price', 'destroy')
+          String constants: []
+      [do_dp] file=main.py line~976
+        Args: ()
+        Locals: ('sel', 'vals', 'p')
+        Globals referred: ('selection', 'item', 'get_processes', 'messagebox', 'askyesno', 'delete_process', 'delete')
+        String constants: ["'values'", "'material'", "'process_name'", "'确认删除'", '\'确定删除工序 "\'', "' - '", '\'" ？\'', "'id'"]
+      [<lambda>] file=main.py line~994
+        Args: ('e',)
+        Locals: ()
+        Globals referred: ()
+        String constants: []
+      [refa] file=main.py line~1002
+        Args: ()
+        Locals: ('item', 'sw', 'wid', 'assigned', 'a', 'aids', 'p')
+        Globals referred: ('get_children', 'delete', 'curselection', 'get_worker_processes', 'get_processes', 'insert', 'END', 'str')
+        String constants: ["'id'", "'process_id'", "''", "'✓'", "'material'", "'process_name'", "'unit_price'"]
+      [togg] file=main.py line~1009
+        Args: ()
+        Locals: ('sw', 'sp', 'wid', 'vals', 'mat', 'pname', 'p', 'a')
+        Globals referred: ('curselection', 'selection', 'item', 'get_processes', 'set', 'get_worker_processes', 'unassign_worker_process', 'assign_worker_process')
+        String constants: ["'id'", "'values'", "'material'", "'process_name'", "'sel'", "'✓'", "'process_id'", "''"]
+      [<lambda>] file=main.py line~1021
+        Args: ('e',)
+        Locals: ()
+        Globals referred: ()
+        String constants: []
+    [_manage_users] file=main.py line~1024
+      Args: ('self',)
+      Locals: ('f', 'do_add', 'do_edit', 'do_del')
+      Globals referred: ('_check_perm', 'Toplevel', 'root', 'title', 'geometry', 'configure', 'CARD', 'grab_set', 'protocol', 'destroy', 'Label', 'DARK', 'pack', 'W', 'ttk', 'Treeview', 'heading', 'column', 'CENTER', 'BOTH', '_tr', 'Frame', 'X', 'Entry', 'LEFT', 'Button', 'ACCENT', '_assign_materials', 'RED')
+      String constants: ["'user_manage'", "'用户管理'", "'600x450'", "'WM_DELETE_WINDOW'", "'用户列表'", "'un'", "'dn'", "'role'", "'headings'", "'用户名'", "'显示名'", "'角色'", "'solid'", "'*'", "'添加'", "'white'", "'flat'", "'hand2'", "'编辑'", "'#2980b9'"]
+      [ref_users] file=main.py line~1033
+        Args: ()
+        Locals: ('i', 'u', 'rl')
+        Globals referred: ('get_children', 'delete', 'get_users', 'insert', 'END')
+        String constants: ["'role'", "'admin'", "'管理员'", "'普通用户'", "''", "'username'", "'display_name'"]
+      [do_add] file=main.py line~1045
+        Args: ()
+        Locals: ('un', 'dn', 'pw')
+        Globals referred: ('get', 'strip', 'messagebox', 'showinfo', 'add_user', 'delete', 'END')
+        String constants: ["'提示'", "'用户名和密码不能为空'", "'用户名已存在'"]
+      [do_edit] file=main.py line~1051
+        Args: ()
+        Locals: ('sel', 'vals', 'f2', 'save')
+        Globals referred: ('selection', 'item', 'Toplevel', 'title', 'geometry', 'configure', 'CARD', 'transient', 'grab_set', 'Frame', 'pack', 'Label', 'grid', 'W', 'Entry', 'insert', 'ttk', 'Combobox', 'set', 'Button', 'ACCENT')
+        String constants: ["'values'", "'编辑用户 '", "'300x180'", "'显示名:'", "'角色:'", "'worker'", "'admin'", "'readonly'", "'新密码(留空不改):'", "'*'", "'保存'", "'white'", "'flat'", "'hand2'"]
+        [save] file=main.py line~1064
+          Args: ()
+          Locals: ()
+          Globals referred: ('update_user_display', 'get', 'strip', 'update_user_pw', 'destroy')
+          String constants: []
+      [do_del] file=main.py line~1070
+        Args: ()
+        Locals: ('sel', 'un')
+        Globals referred: ('selection', 'item', 'messagebox', 'showinfo', 'askyesno', 'delete_user')
+        String constants: ["'values'", "'admin'", "'提示'", "'不能删除admin账户'", "'确认'", "'确定删除 '", "' ？'"]
+    [_manage_permissions] file=main.py line~1080
+      Args: ('self',)
+      Locals: ('top', 'mid', 'u')
+      Globals referred: ('_check_perm', 'Toplevel', 'root', 'title', 'geometry', 'configure', 'CARD', 'grab_set', 'Label', 'DARK', 'pack', 'W', 'Frame', 'BOTH', 'Listbox', 'get_users', 'insert', 'END', 'X', 'ttk', 'Treeview', 'heading', 'column', 'CENTER', 'bind', 'Button', 'PRIMARY')
+      String constants: ["'user_manage'", "'权限管理'", "'700x500'", "'用户权限配置'", "'选择用户：'", "'solid'", "'username'", "'('", "'display_name'", "')'", "'key'", "'desc'", "'on'", "'headings'", "'权限键'", "'说明'", "'开启'", "'<<ListboxSelect>>'", "'<Double-1>'", "'双击切换权限开关'"]
+      [ref_perms] file=main.py line~1097
+        Args: ()
+        Locals: ('i', 'sel', 'un', 'perms', 'descs', 'p')
+        Globals referred: ('get_children', 'delete', 'curselection', 'get_user_perms', 'insert', 'END', 'get')
+        String constants: ["'username'", "'record_add'", "'添加记录'", "'record_delete'", "'删除记录'", "'record_edit'", "'编辑记录'", "'material_manage'", "'管理物料'", "'worker_manage'", "'管理工人'", "'process_manage'", "'管理工序'", "'assignment_manage'", "'工人工序分配'", "'chart_view'", "'查看图表'", "'summary_view'", "'查看汇总'", "'export_excel'"]
+      [<lambda>] file=main.py line~1109
+        Args: ('e',)
+        Locals: ()
+        Globals referred: ()
+        String constants: []
+      [<lambda>] file=main.py line~1111
+        Args: ('e',)
+        Locals: ()
+        Globals referred: ()
+        String constants: []
+      [toggle] file=main.py line~1112
+        Args: ()
+        Locals: ('sel_lb', 'sel_tr', 'un', 'pk', 'cur', 'newv')
+        Globals referred: ('curselection', 'selection', 'item', 'set', 'set_user_perm')
+        String constants: ["'username'", "'values'", "'on'", "'✓'", "''"]
+    [_summary_page] file=main.py line~1123
+      Args: ('self',)
+      Locals: ('top', 'bt', 'nb', 'i', 'name', 'tab')
+      Globals referred: ('Toplevel', 'root', 'title', 'geometry', 'configure', 'BG', 'transient', 'ttk', 'Notebook', 'pack', 'BOTH', 'enumerate', 'Frame', 'add')
+      String constants: ["'汇总查询'", "'920x700'"]
+      [gd] file=main.py line~1126
+        Args: ('mode',)
+        Locals: ('t',)
+        Globals referred: ('date', 'today', 'isoformat', 'timedelta', 'weekday', 'strftime')
+        String constants: ["'%Y-%m'", "'-01'"]
+      [bt] file=main.py line~1131
+        Args: ('tab', 'mode')
+        Locals: ('f', 'fl', 'sd', 'ed', 'pv', 'p', 'wv', 'w', 'dq', 'ex', 'sf', 'key', 'txt', 'fc', 'lb', 'tf', 'cols', 'hd', 'wd', 'c', 'vsb', 'hsb')
+        Globals referred: ('Frame', 'BG', 'pack', 'BOTH', 'CARD', 'X', 'Label', 'LEFT', 'Entry', 'insert', 'get_processes', 'append', 'ttk', 'Combobox', 'set', 'get_workers', 'Button', 'PRIMARY', 'GREEN', 'RIGHT', 'DARK', 'Treeview', 'heading', 'column', 'CENTER', 'Scrollbar', 'VERTICAL', 'yview', 'HORIZONTAL', 'xview', 'configure', 'Y', 'BOTTOM')
+        String constants: ["'#ddd'", "'日期:'", "'solid'", "'~'", "'工序:'", "'全部'", "'material'", "' - '", "'process_name'", "'readonly'", "'工人:'", "'name'", "'('", "'group_name'", "')'", "'查询'", "'white'", "'flat'", "'hand2'", "'导出Excel'"]
+        [dq] file=main.py line~1147
+          Args: ()
+          Locals: ('sd', 'ed', 'pf', 'pf_id', 'wf_id', 'p', 'wf_idx', 'stats', 't', 'i', 'r', 'wg')
+          Globals referred: ('get', 'strip', 'current', 'get_stats', 'config', 'str', 'round', 'YEN', 'ACCENT', 'get_children', 'delete', 'get_all_records', 'insert', 'END')
+          String constants: ["'material'", "' - '", "'process_name'", "'id'", "'totals'", "'w'", "'q'", "'e'", "'r'", "'record_date'", "'process_id'", "'worker_id'", "'quantity'", "'unit_price'", "''", "'worker_name'", "'group_name'"]
+        [ex] file=main.py line~1167
+          Args: ()
+          Locals: ('sd', 'ed', 'pf', 'pf_id', 'pf_name', 'wf_id', 'p', 'wf_idx', 'records', 'r', 'filtered', 'groups', 'd', 'filedialog', 'path', 'ex')
+          Globals referred: ('get', 'strip', 'current', 'get_all_records', 'messagebox', 'showinfo', 'append', 'tkinter', 'filedialog', 'asksaveasfilename', 'date', 'today', 'isoformat', 'export_excel', 'Exception', 'showerror', 'str')
+          String constants: ["'material'", "' - '", "'process_name'", "'id'", "'record_date'", "'process_id'", "'提示'", "'没有数据可以导出'", "'保存Excel文件'", "'.xlsx'", "'生产记录('", "')_'", "'成功'", "'已导出到：'", "'错误'", "'导出失败：'"]
+    [_show_calendar] file=main.py line~1211
+      Args: ('self',)
+      Locals: ('p', 'hdr', 'prev', 'nxt')
+      Globals referred: ('Toplevel', 'root', 'title', 'geometry', 'format', 'winfo_x', 'winfo_width', 'winfo_y', 'winfo_height', 'configure', 'CARD', 'grab_set', 'e_date', 'get', 'strip', 'split', 'int', 'date', 'today', 'year', 'month', 'Frame', 'pack', 'X', 'Label', 'LEFT', 'BOTH', 'Button', 'RIGHT')
+      String constants: ["'选择日期'", "'260x230+{}+{}'", "'-'", "''", "'<'", "'flat'", "'>'"]
+      [ref] file=main.py line~1221
+        Args: ()
+        Locals: ('w', 'i2', 'd', 'ri', 'ci', 'dis')
+        Globals referred: ('winfo_children', 'destroy', 'enumerate', 'Label', 'CARD', 'grid', 'calendar', 'monthcalendar', 'date', 'today', 'Button', 'str', 'config')
+        String constants: ["'一二三四五六日'", "'#888'", "'normal'", "'disabled'", "'#333'", "'#ccc'", "'年'", "'月'"]
+        [<lambda>] file=main.py line~1229
+          Args: ('dd',)
+          Locals: ()
+          Globals referred: ()
+          String constants: []
+      [prev] file=main.py line~1231
+        Args: ()
+        Locals: ()
+        Globals referred: ()
+        String constants: []
+      [nxt] file=main.py line~1235
+        Args: ()
+        Locals: ()
+        Globals referred: ()
+        String constants: []
+      [pick] file=main.py line~1241
+        Args: ('d',)
+        Locals: ()
+        Globals referred: ('e_date', 'config', 'delete', 'END', 'insert', 'format', 'destroy')
+        String constants: ["'normal'", "'{:04d}-{:02d}-{:02d}'", "'readonly'"]
+    [_msg] file=main.py line~1245
+      Args: ('self', 'txt', 'color')
+      Locals: ()
+      Globals referred: ('msg', 'config', 'root', 'after')
+      String constants: []
+      [<lambda>] file=main.py line~1246
+        Args: ()
+        Locals: ()
+        Globals referred: ('msg', 'config')
+        String constants: ["''"]
+    [run] file=main.py line~1247
+      Args: ('self',)
+      Locals: ()
+      Globals referred: ('root', 'mainloop')
+      String constants: []

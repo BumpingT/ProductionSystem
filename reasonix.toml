@@ -1,0 +1,2 @@
+[permissions]
+allow = ["Edit", "Bash(python -m PyInstaller --onefile --windowed --name ProductionSystem_v10 main.py 2>&1)", "Bash(Select-String -Path \"C:\\Users\\Administrator\\Documents\\Recording\\main.py\" -Pattern \"^(import |from )\" | Select-Object -First 30)", "Bash(python -m pip install tkinter-reload 2>&1)", "Bash(python -m pip install watchdog 2>&1)"]

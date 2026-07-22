@@ -1,0 +1,6 @@
+# Recovered from ProductionSystem_v39.exe
+# Source: main.py
+
+          RESUME                   0
+          LOAD_CONST               0 (None)
+          RETURN_VALUE

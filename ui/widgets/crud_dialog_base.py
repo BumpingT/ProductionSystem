@@ -1,7 +1,7 @@
 """
 管理对话框基类 — 消除重复的 CRUD 对话框代码
 """
-from tkinter import Toplevel, Label, Frame, Button, ttk, END, Entry
+from tkinter import Toplevel, Label, Frame, Button, ttk, END, Entry, W
 from config import CARD, DARK, ACCENT, RED, GREEN
 
 

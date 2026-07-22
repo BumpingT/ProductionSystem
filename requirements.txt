@@ -1,0 +1,10 @@
+# 生产管理系统 依赖
+# 核心依赖（Python 标准库，无需安装）
+#   tkinter, sqlite3, hashlib, json, os, sys, logging, webbrowser,
+#   tempfile, shutil, calendar, datetime, base64, secrets
+
+# 可选依赖（按需安装）
+openpyxl>=3.0.0    # Excel 导出（pip install openpyxl）
+
+# 打包工具（开发用）
+# PyInstaller>=6.0.0  # pyinstaller --onefile --windowed --add-data "echarts.min.js;." main.py
