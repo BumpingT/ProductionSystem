@@ -24,7 +24,18 @@ class MaterialRepository:
     @staticmethod
     def update(mid: int, name: str, price: float):
         conn = Database.get_conn()
+        # 获取旧名称
+        row = conn.execute("SELECT name FROM materials WHERE id=?", (mid,)).fetchone()
+        if not row:
+            logger.warning(f'更新物料失败: ID={mid} 不存在')
+            return
+        old_name = row['name']
+        # 更新物料表
         conn.execute("UPDATE materials SET name=?,price=? WHERE id=?", (name, price, mid))
+        # 同步更新工序表中的物料名称
+        if old_name != name:
+            conn.execute("UPDATE processes SET material=? WHERE material=?", (name, old_name))
+            logger.info(f'物料改名: {old_name} -> {name}，已同步工序表')
         conn.commit()
 
     @staticmethod
