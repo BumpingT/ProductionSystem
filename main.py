@@ -7,26 +7,17 @@ from datetime import date, timedelta
 from tkinter import *
 from tkinter import ttk, messagebox
 
+# ── 使用新架构模块 ──
+from config import DB_PATH, ECHARTS_PATH, LOGIN_CRED_PATH, YEN, ALL_PERMS
+from config import BG, CARD, PRIMARY, ACCENT, GREEN, RED, DARK
+from utils.auth import hash_password as _hash_pw, verify_password as _verify_pw
+from utils.auth import save_credential as _save_cred, load_credential as _load_cred
+from utils.auth import clear_credential as _clear_cred
+
 def _rp(rel):
     try: base = sys._MEIPASS
     except: base = os.path.dirname(os.path.abspath(__file__))
     return os.path.join(base, rel)
-
-if getattr(sys, "frozen", False): _BASE = os.path.dirname(sys.executable)
-else: _BASE = os.path.dirname(os.path.abspath(__file__))
-DB_PATH = os.path.join(_BASE, 'data.db')
-ECHARTS_PATH = _rp('echarts.min.js')
-YEN = chr(0xa5)
-LOGIN_CRED_PATH = os.path.join(_BASE, '.login_cred')
-
-ALL_PERMS = ['record_add','record_delete','record_edit','material_manage','worker_manage',
-             'process_manage','assignment_manage','chart_view','summary_view','export_excel','user_manage']
-ROLE_ADMIN = 'admin'
-ROLE_LEADER = 'leader'
-ROLE_WORKER = 'worker'
-
-BG = '#f0f2f5'; CARD = '#ffffff'; PRIMARY = '#1a73e8'
-ACCENT = '#e67e22'; GREEN = '#27ae60'; RED = '#e74c3c'; DARK = '#2c3e50'
 
 def _set_placeholder(entry, text):
     entry._ph_text = text
@@ -40,242 +31,55 @@ def _set_placeholder(entry, text):
             entry.insert(0, entry._ph_text); entry.config(fg='#999999')
     entry.bind('<FocusIn>', _in, '+'); entry.bind('<FocusOut>', _out, '+')
 
-def _hash_pw(pw):
-    salt = secrets.token_hex(16)
-    h = hashlib.pbkdf2_hmac('sha256', pw.encode(), salt.encode(), 100000).hex()
-    return salt + h
-
-def _verify_pw(pw, stored):
-    salt = stored[:32]
-    h = hashlib.pbkdf2_hmac('sha256', pw.encode(), salt.encode(), 100000).hex()
-    return (salt + h) == stored
-
-def _save_cred(un, pw):
-    try:
-        data = json.dumps({'u':un,'p':base64.b64encode(pw.encode()).decode()})
-        with open(LOGIN_CRED_PATH, 'w') as f: f.write(data)
-    except: pass
-
-def _load_cred():
-    try:
-        d = json.loads(open(LOGIN_CRED_PATH).read())
-        d['p'] = base64.b64decode(d['p']).decode()
-        return d
-    except: return None
-
-def _clear_cred():
-    try:
-        if os.path.exists(LOGIN_CRED_PATH): os.remove(LOGIN_CRED_PATH)
-    except: pass
 
 # ── Database ──
 
-def init_db():
-    conn = sqlite3.connect(DB_PATH); c = conn.cursor()
-    c.execute("CREATE TABLE IF NOT EXISTS materials (id INTEGER PRIMARY KEY AUTOINCREMENT,name TEXT NOT NULL UNIQUE,price REAL DEFAULT 0)")
-    try: c.execute("ALTER TABLE materials ADD COLUMN price REAL DEFAULT 0")
-    except: pass
-    c.execute("UPDATE materials SET price=5.0 WHERE price IS NULL")
-    c.execute("CREATE TABLE IF NOT EXISTS workers (id INTEGER PRIMARY KEY AUTOINCREMENT,name TEXT NOT NULL UNIQUE,group_name TEXT NOT NULL DEFAULT '')")
-    try: c.execute("ALTER TABLE workers ADD COLUMN group_name TEXT NOT NULL DEFAULT ''")
-    except: pass
-    c.execute("CREATE TABLE IF NOT EXISTS processes (id INTEGER PRIMARY KEY AUTOINCREMENT,material TEXT NOT NULL,process_name TEXT NOT NULL,unit_price REAL NOT NULL DEFAULT 0,UNIQUE(material,process_name))")
-    c.execute("CREATE TABLE IF NOT EXISTS worker_processes (id INTEGER PRIMARY KEY AUTOINCREMENT,worker_id INTEGER NOT NULL,process_id INTEGER NOT NULL,UNIQUE(worker_id,process_id))")
-    c.execute("CREATE TABLE IF NOT EXISTS records (id INTEGER PRIMARY KEY AUTOINCREMENT,worker_id INTEGER NOT NULL DEFAULT 0,process_id INTEGER NOT NULL DEFAULT 0,quantity REAL NOT NULL,unit_price REAL NOT NULL,record_date TEXT NOT NULL,created_at TEXT DEFAULT (datetime('now','localtime')))")
-    try: c.execute("ALTER TABLE records ADD COLUMN worker_id INTEGER")
-    except: pass
-    c.execute("CREATE TABLE IF NOT EXISTS users (id INTEGER PRIMARY KEY AUTOINCREMENT,username TEXT NOT NULL UNIQUE,password_hash TEXT NOT NULL,display_name TEXT NOT NULL DEFAULT '',role TEXT NOT NULL DEFAULT 'worker',worker_id INTEGER DEFAULT 0,created_at TEXT DEFAULT (datetime('now','localtime')))")
-    try: c.execute("ALTER TABLE users ADD COLUMN worker_id INTEGER DEFAULT 0")
-    except: pass
-    c.execute("CREATE TABLE IF NOT EXISTS user_permissions (id INTEGER PRIMARY KEY AUTOINCREMENT,username TEXT NOT NULL,perm_key TEXT NOT NULL,allowed INTEGER NOT NULL DEFAULT 0,UNIQUE(username,perm_key))")
-    c.execute("CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value TEXT)")
-    seeded = c.execute("SELECT value FROM settings WHERE key=?", ("seeded",)).fetchone()
-    if not seeded:
-        c.executemany("INSERT INTO workers (name,group_name) VALUES (?,?)",[('张三','切割组'),('李四','组装组'),('王五','切割组'),('赵六','上色组'),('孙七','包装组'),('吴九','检验组')])
-        c.executemany("INSERT OR IGNORE INTO materials (name,price) VALUES (?,?)",[('A-1001',5.5),('A-1002',6.0),('B-2001',8.0),('B-2002',8.5),('C-3001',6.0),('C-3002',7.0),('D-4001',12.0),('D-4002',10.0),('E-5001',11.0),('E-5002',9.5)])
-        c.executemany("INSERT OR IGNORE INTO processes (material,process_name,unit_price) VALUES (?,?,?)",[('A-1001','切割',1.5),('A-1001','打磨',2.0),('A-1001','组装',1.8),('B-2001','切割',2.0),('B-2001','上色',2.5),('B-2001','包装',1.2),('C-3001','切割',1.8),('C-3001','打磨',2.2),('C-3001','组装',2.0),('D-4001','切割',2.5),('D-4001','打磨',3.0),('D-4001','抛光',2.8),('E-5001','切割',3.0),('E-5001','组装',2.5),('E-5001','检验',1.5)])
-        c.executemany("INSERT OR IGNORE INTO worker_processes (worker_id,process_id) VALUES (?,?)",[(1,1),(1,2),(1,3),(2,4),(2,5),(3,1),(3,2),(4,5),(4,11),(5,6),(5,8),(6,9),(6,12),(6,15)])
-        c.executemany("INSERT INTO records (worker_id,process_id,quantity,unit_price,record_date) VALUES (?,?,?,?,?)",[(1,1,50,1.5,'2026-07-20'),(1,2,30,2.0,'2026-07-20'),(2,4,35,2.5,'2026-07-20'),(3,1,60,1.5,'2026-07-20'),(1,1,40,1.5,'2026-07-21'),(1,3,25,1.8,'2026-07-21'),(2,5,42,1.2,'2026-07-21'),(4,5,28,2.5,'2026-07-21'),(3,2,55,2.0,'2026-07-22'),(5,6,45,1.2,'2026-07-22'),(6,9,32,2.2,'2026-07-22'),(1,2,35,2.0,'2026-07-22'),(2,4,48,2.5,'2026-07-23'),(3,1,62,1.5,'2026-07-23'),(4,11,20,3.0,'2026-07-23'),(5,8,38,1.2,'2026-07-23')])
-        c.execute("INSERT INTO settings (key,value) VALUES (?,?)", ("seeded", "1"))
-    c.execute("SELECT COUNT(*) FROM users")
-    if c.fetchone()[0] == 0:
-        pw = _hash_pw('admin123')
-        c.execute("INSERT INTO users (username,password_hash,display_name,role) VALUES (?,?,?,?)", ('admin',pw,'系统管理员','admin'))
-        for pk in ALL_PERMS:
-            c.execute("INSERT OR IGNORE INTO user_permissions (username,perm_key,allowed) VALUES (?,?,1)", ('admin',pk))
-    conn.commit(); conn.close()
+from models.database import Database
+from models.material import MaterialRepository
+from models.worker import WorkerRepository
+from models.process import ProcessRepository
+from models.record import RecordRepository
+from models.user import UserRepository
 
-def get_conn():
-    conn = sqlite3.connect(DB_PATH); conn.row_factory = sqlite3.Row; return conn
+init_db = Database.init_db
+get_conn = Database.get_conn
+get_materials = MaterialRepository.get_all
+add_material = MaterialRepository.add
+update_material = MaterialRepository.update
+delete_material = MaterialRepository.delete
+get_workers = WorkerRepository.get_all
+add_worker = WorkerRepository.add
+delete_worker = WorkerRepository.delete
+get_processes = ProcessRepository.get_all
+add_process = ProcessRepository.add
+delete_process = ProcessRepository.delete
+get_worker_processes = RecordRepository.get_worker_processes
+assign_worker_process = RecordRepository.assign_worker_process
+unassign_worker_process = RecordRepository.unassign_worker_process
 
-def get_users():
-    conn = get_conn(); rows = conn.execute("SELECT * FROM users ORDER BY id").fetchall(); conn.close()
-    return [dict(r) for r in rows]
+# ── 仍在 main.py 中使用的函数 ──
+get_users = UserRepository.get_all
+get_user_by_worker_id = UserRepository.get_by_worker_id
+add_user = UserRepository.add
+update_user_pw = UserRepository.update_password
+update_user_display = UserRepository.update_profile
+delete_user = UserRepository.delete
+get_user_perms = UserRepository.get_permissions
+set_user_perm = UserRepository.set_permission
+update_worker = WorkerRepository.update
+update_material = MaterialRepository.update
+update_process = ProcessRepository.update
+add_record = RecordRepository.add
+update_record = RecordRepository.update
+delete_record = RecordRepository.delete
+get_all_records = RecordRepository.get_all
+get_stats = RecordRepository.get_stats
+list_months = RecordRepository.list_months
 
-def get_user_by_worker_id(wid):
-    conn = get_conn(); r = conn.execute("SELECT * FROM users WHERE worker_id=?", (wid,)).fetchone(); conn.close()
-    return dict(r) if r else None
+# ── 基本路径 ──
+if getattr(sys, "frozen", False): _BASE = os.path.dirname(sys.executable)
+else: _BASE = os.path.dirname(os.path.abspath(__file__))
 
-def add_user(un, pw, dn='', role='worker', worker_id=0):
-    conn = get_conn()
-    try:
-        h = _hash_pw(pw)
-        conn.execute("INSERT INTO users (username,password_hash,display_name,role,worker_id) VALUES (?,?,?,?,?)", (un,h,dn,role,worker_id))
-        for pk in ALL_PERMS:
-            conn.execute("INSERT OR IGNORE INTO user_permissions (username,perm_key,allowed) VALUES (?,?,0)", (un,pk))
-        conn.commit(); conn.close(); return True
-    except: conn.close(); return False
-
-def update_user_pw(un, pw):
-    conn = get_conn(); h = _hash_pw(pw)
-    conn.execute("UPDATE users SET password_hash=? WHERE username=?", (h,un))
-    conn.commit(); conn.close()
-
-def update_user_display(un, dn, role, worker_id=0):
-    conn = get_conn()
-    conn.execute("UPDATE users SET display_name=?,role=?,worker_id=? WHERE username=?", (dn,role,worker_id,un))
-    conn.commit(); conn.close()
-
-def delete_user(un):
-    if un == 'admin': return False
-    conn = get_conn()
-    conn.execute("DELETE FROM users WHERE username=?", (un,))
-    conn.execute("DELETE FROM user_permissions WHERE username=?", (un,))
-    conn.commit(); conn.close(); return True
-
-def get_user_perms(un):
-    conn = get_conn()
-    rows = conn.execute("SELECT perm_key,allowed FROM user_permissions WHERE username=?", (un,)).fetchall()
-    conn.close()
-    return {r['perm_key']:r['allowed'] for r in rows}
-
-def set_user_perm(un, perm_key, allowed):
-    conn = get_conn()
-    conn.execute("INSERT OR REPLACE INTO user_permissions (username,perm_key,allowed) VALUES (?,?,?)", (un,perm_key,allowed))
-    conn.commit(); conn.close()
-
-def get_materials():
-    conn = get_conn(); rows = conn.execute("SELECT * FROM materials ORDER BY name").fetchall(); conn.close()
-    return [dict(r) for r in rows]
-
-def add_material(name, price=0):
-    conn = get_conn()
-    try: conn.execute("INSERT INTO materials (name,price) VALUES (?,?)", (name,price)); conn.commit(); return True
-    except: return False
-    finally: conn.close()
-
-def update_material(mid, name, price):
-    conn = get_conn(); conn.execute("UPDATE materials SET name=?,price=? WHERE id=?", (name,price,mid))
-    conn.commit(); conn.close()
-
-def delete_material(mid):
-    conn = get_conn(); conn.execute("DELETE FROM materials WHERE id=?", (mid,)); conn.commit(); conn.close()
-
-def get_workers():
-    conn = get_conn(); rows = conn.execute("SELECT * FROM workers ORDER BY name").fetchall(); conn.close()
-    return [dict(r) for r in rows]
-
-def add_worker(name, group=''):
-    conn = get_conn()
-    try: conn.execute("INSERT INTO workers (name,group_name) VALUES (?,?)", (name,group)); conn.commit(); return True
-    except: return False
-    finally: conn.close()
-
-def update_worker(wid, name, group):
-    conn = get_conn(); conn.execute("UPDATE workers SET name=?,group_name=? WHERE id=?", (name,group,wid))
-    conn.commit(); conn.close()
-
-def delete_worker(wid):
-    conn = get_conn(); conn.execute("DELETE FROM workers WHERE id=?", (wid,))
-    conn.execute("DELETE FROM worker_processes WHERE worker_id=?", (wid,))
-    conn.commit(); conn.close()
-
-def get_processes():
-    conn = get_conn(); rows = conn.execute("SELECT p.*,m.price FROM processes p LEFT JOIN materials m ON p.material=m.name ORDER BY p.material,p.process_name").fetchall(); conn.close()
-    return [dict(r) for r in rows]
-
-def add_process(material, pname, unit_price):
-    conn = get_conn()
-    try: conn.execute("INSERT INTO processes (material,process_name,unit_price) VALUES (?,?,?)", (material,pname,unit_price)); conn.commit(); return True
-    except: return False
-    finally: conn.close()
-
-def update_process(pid, material, pname, unit_price):
-    conn = get_conn(); conn.execute("UPDATE processes SET material=?,process_name=?,unit_price=? WHERE id=?", (material,pname,unit_price,pid))
-    conn.commit(); conn.close()
-
-def delete_process(pid):
-    conn = get_conn(); conn.execute("DELETE FROM processes WHERE id=?", (pid,))
-    conn.execute("DELETE FROM worker_processes WHERE process_id=?", (pid,))
-    conn.commit(); conn.close()
-
-def get_worker_processes(wid):
-    conn = get_conn(); rows = conn.execute("SELECT process_id FROM worker_processes WHERE worker_id=?", (wid,)).fetchall()
-    conn.close()
-    return [r['process_id'] for r in rows]
-
-def assign_worker_process(wid, pid):
-    conn = get_conn()
-    try: conn.execute("INSERT INTO worker_processes (worker_id,process_id) VALUES (?,?)", (wid,pid)); conn.commit()
-    except: pass
-    finally: conn.close()
-
-def unassign_worker_process(wid, pid):
-    conn = get_conn(); conn.execute("DELETE FROM worker_processes WHERE worker_id=? AND process_id=?", (wid,pid))
-    conn.commit(); conn.close()
-
-def add_record(wid, pid, qty, price, d):
-    conn = get_conn()
-    try:
-        conn.execute("INSERT INTO records (worker_id,process_id,quantity,unit_price,record_date) VALUES (?,?,?,?,?)", (wid,pid,qty,price,d))
-        conn.commit(); return True
-    except: return False
-    finally: conn.close()
-
-def update_record(rid, wid, pid, qty, price, d):
-    conn = get_conn(); conn.execute("UPDATE records SET worker_id=?,process_id=?,quantity=?,unit_price=?,record_date=? WHERE id=?", (wid,pid,qty,price,d,rid))
-    conn.commit(); conn.close()
-
-def delete_record(rid):
-    conn = get_conn(); conn.execute("DELETE FROM records WHERE id=?", (rid,)); conn.commit(); conn.close()
-
-def get_all_records(user=None):
-    conn = get_conn()
-    if user and user.get('role') == 'worker' and user.get('worker_id'):
-        rows = conn.execute("""
-            SELECT r.*,w.name AS worker_name,w.group_name,p.material,p.process_name,p.unit_price AS default_price
-            FROM records r LEFT JOIN workers w ON r.worker_id=w.id LEFT JOIN processes p ON r.process_id=p.id
-            WHERE r.worker_id=? ORDER BY r.id DESC LIMIT 500
-        """, (user['worker_id'],)).fetchall()
-    else:
-        rows = conn.execute("""
-            SELECT r.*,w.name AS worker_name,w.group_name,p.material,p.process_name,p.unit_price AS default_price
-            FROM records r LEFT JOIN workers w ON r.worker_id=w.id LEFT JOIN processes p ON r.process_id=p.id
-            ORDER BY r.id DESC LIMIT 500
-        """).fetchall()
-    conn.close()
-    return [dict(r) for r in rows]
-
-def get_stats(start_date=None, end_date=None, process_filter=None, worker_filter=None):
-    conn = get_conn()
-    wh = []; pa = []
-    if start_date: wh.append("r.record_date >= ?"); pa.append(start_date)
-    if end_date: wh.append("r.record_date <= ?"); pa.append(end_date)
-    if process_filter: wh.append("r.process_id=?"); pa.append(process_filter)
-    if worker_filter: wh.append("r.worker_id=?"); pa.append(worker_filter)
-    ws = " WHERE " + " AND ".join(wh) if wh else ""
-    totals = conn.execute(f"SELECT COUNT(*) AS r,COUNT(DISTINCT r.worker_id) AS w,COALESCE(SUM(r.quantity),0) AS q,COALESCE(SUM(r.quantity*r.unit_price),0) AS e FROM records r{ws}", pa).fetchone()
-    by_worker = conn.execute(f"SELECT w.name AS worker,w.group_name,SUM(r.quantity) AS q,SUM(r.quantity*r.unit_price) AS e FROM records r LEFT JOIN workers w ON r.worker_id=w.id{ws} GROUP BY r.worker_id ORDER BY e DESC", pa).fetchall()
-    by_process = conn.execute(f"SELECT p.material,p.process_name,SUM(r.quantity) AS q,SUM(r.quantity*r.unit_price) AS e FROM records r LEFT JOIN processes p ON r.process_id=p.id{ws} GROUP BY r.process_id ORDER BY q DESC", pa).fetchall()
-    by_date = conn.execute(f"SELECT r.record_date,SUM(r.quantity) AS q,SUM(r.quantity*r.unit_price) AS e,COUNT(*) AS c FROM records r{ws} GROUP BY r.record_date ORDER BY r.record_date", pa).fetchall()
-    conn.close()
-    return {'totals':dict(totals),'by_worker':[dict(r) for r in by_worker],'by_process':[dict(r) for r in by_process],'by_date':[dict(r) for r in by_date]}
-
-def list_months():
-    conn = get_conn()
-    rows = conn.execute("SELECT DISTINCT substr(record_date,1,7) AS m FROM records ORDER BY m DESC").fetchall()
-    conn.close()
-    return [r['m'] for r in rows]
 
 def _chart_html(stats, title=''):
     t = stats['totals']; w = stats['by_worker']; d = stats['by_date']; p = stats['by_process']
