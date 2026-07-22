@@ -331,8 +331,8 @@ def export_excel(stats, filepath, title=''):
     headers = ['工人', '组别', '件数', '工资']
     for ci, h in enumerate(headers, 1):
         cell = ws.cell(row=4, column=ci, value=h)
-        cell.font = Font(bold=True, color='white')
-        cell.fill = PatternFill('solid', fgColor='1a73e8')
+        cell.font = Font(bold=True, color='00ffffff')
+        cell.fill = PatternFill('solid', fgColor='001a73e8')
         cell.alignment = Alignment(horizontal='center')
     for ri, r in enumerate(stats.get('by_worker',[]), 5):
         ws.cell(row=ri, column=1, value=r.get('worker',''))
@@ -477,7 +477,7 @@ class App:
         
         fw = Frame(row, bg=CARD); fw.pack(side=LEFT, padx=(0,8))
         Label(fw, text='选择工人', bg=CARD, fg='#666', font=('Microsoft YaHei',9)).pack(anchor=W, padx=(2,0))
-        cb_worker = ttk.Combobox(fw, width=12, font=('Microsoft YaHei',10), state='readonly'); cb_worker.pack()
+        self.cb_worker = ttk.Combobox(fw, width=12, font=('Microsoft YaHei',10), state='readonly'); self.cb_worker.pack()
         
         fp = Frame(row, bg=CARD); fp.pack(side=LEFT, padx=(0,8))
         Label(fp, text='选择工序', bg=CARD, fg='#666', font=('Microsoft YaHei',9)).pack(anchor=W, padx=(2,0))
@@ -492,12 +492,13 @@ class App:
         Label(fd, text='日期', bg=CARD, fg='#666', font=('Microsoft YaHei',9)).pack(anchor=W, padx=(2,0))
         e_date = Entry(fd, width=12, font=('Microsoft YaHei',11), relief='solid', bd=1, justify=CENTER)
         e_date.pack(); e_date.insert(0, date.today().isoformat())
+        e_date.bind('<Button-1>', lambda e: self.show_calendar(e_date))
         
         price_label = Label(row, text='', bg=CARD, fg=ACCENT, font=('Microsoft YaHei',10,'bold'))
         price_label.pack(side=LEFT, padx=(4,8))  # Will show unit price
         
         def on_worker_sel(ev):
-            sel = cb_worker.current()
+            sel = self.cb_worker.current()
             if sel < 0: return
             wid = self._worker_ids[sel] if hasattr(self, '_worker_ids') and sel < len(self._worker_ids) else 0
             if hasattr(self, '_worker_procs') and wid in self._worker_procs:
@@ -510,29 +511,31 @@ class App:
         def on_process_sel(ev):
             sel = cb_process.current()
             if sel < 0: return
-            wid = cb_worker.current()
+            wid = self.cb_worker.current()
             if wid >= 0 and hasattr(self, '_worker_ids') and wid < len(self._worker_ids):
                 widsel = self._worker_ids[wid]
                 procs = self._worker_procs.get(widsel, [])
                 if sel < len(procs):
                     price_label.config(text=f"单价: {YEN}{procs[sel]['unit_price']}")
         
-        cb_worker.bind('<<ComboboxSelected>>', on_worker_sel)
+        self.cb_worker.bind('<<ComboboxSelected>>', on_worker_sel)
         cb_process.bind('<<ComboboxSelected>>', on_process_sel)
         
         def do_add():
-            wid = cb_worker.current()
-            pid = cb_process.current()
+            wid = self.cb_worker.current()
+            pid = self.cb_process.current()
             qty_s = e_qty.get().strip()
             d = e_date.get().strip()
             if wid < 0 or pid < 0 or not qty_s: messagebox.showinfo('提示','请选择工人、工序并填写件数'); return
             try: qty = float(qty_s)
             except: messagebox.showinfo('提示','件数必须为数字'); return
             widsel = self._worker_ids[wid]
+            proc_id = 0; price = 0
             if widsel in self._worker_procs and pid < len(self._worker_procs[widsel]):
-                price = self._worker_procs[widsel][pid]['unit_price']
-            else: price = 0
-            if add_record(widsel, 0, qty, price, d):
+                proc = self._worker_procs[widsel][pid]
+                proc_id = proc['id']
+                price = proc['unit_price']
+            if add_record(widsel, proc_id, qty, price, d):
                 e_qty.delete(0, END); self.refresh(); messagebox.showinfo('成功','记录已添加')
             else: messagebox.showerror('错误','添加失败')
         
@@ -648,22 +651,16 @@ class App:
             procs = []
             for p in get_processes():
                 wp = get_worker_processes(w['id'])
-                if p['id'] in wp or True:  # Show all processes for now
+                if p['id'] in wp or True:
                     procs.append(p)
             self._worker_procs[w['id']] = procs
         
-        # Update combobox
-        for child in self.root.winfo_children():
-            self._find_and_update(child)
+        # Update worker combobox
+        if hasattr(self, 'cb_worker'):
+            self.cb_worker['values'] = [w['name'] for w in get_workers()]
         
         # Refresh table
         self._refresh_table()
-    
-    def _find_and_update(self, parent):
-        if isinstance(parent, ttk.Combobox) and parent.winfo_children():
-            pass  # Will be handled by the main loop
-        for child in parent.winfo_children():
-            self._find_and_update(child)
     
     def _refresh_table(self):
         tr = self._tree
@@ -701,7 +698,10 @@ class App:
         def do():
             m = cb.get()
             if not m: return
-            stats = get_stats(start_date=m+'-01', end_date=m+'-31')
+            import calendar as cal_mod
+            y, mo = int(m.split('-')[0]), int(m.split('-')[1])
+            _, ld = cal_mod.monthrange(y, mo)
+            stats = get_stats(start_date=m+'-01', end_date=f'{m}-{ld:02d}')
             gen_report(stats, f'{m} 月度汇总')
         
         Button(top, text='生成报告', command=do, bg=PRIMARY, fg='white',
@@ -716,7 +716,7 @@ class App:
             tr.delete(*tr.get_children())
             m = cb.get()
             if not m: return
-            stats = get_stats(start_date=m+'-01', end_date=m+'-31')
+            stats = get_stats(start_date=m+'-01', end_date=f'{m}-{ld:02d}')
             for r in stats.get('by_worker',[]):
                 tr.insert('', END, values=(r['worker'],r['group_name'],r['q'],round(r['e'],2)))
         
@@ -727,7 +727,10 @@ class App:
             m = cb.get()
             if not m: return
             path = os.path.join(_BASE, f'月度汇总_{m}.xlsx')
-            stats = get_stats(start_date=m+'-01', end_date=m+'-31')
+            import calendar as cal_mod
+            y, mo = int(m.split('-')[0]), int(m.split('-')[1])
+            _, ld = cal_mod.monthrange(y, mo)
+            stats = get_stats(start_date=m+'-01', end_date=f'{m}-{ld:02d}')
             if export_excel(stats, path, f'{m} 月度汇总'):
                 messagebox.showinfo('成功', f'已导出: {path}')
         
@@ -928,6 +931,67 @@ class App:
                 cb = Checkbutton(frame, variable=var, bg=CARD, command=make_cmd(un, pk))
                 cb.grid(row=ri, column=ci)
     
+    def show_calendar(self, entry):
+        """弹出日历选择器，选中日期后填入 entry"""
+        top = Toplevel(self.root); top.title('选择日期')
+        top.geometry('300x260'); top.resizable(False, False)
+        top.configure(bg=CARD); top.grab_set(); top.transient(self.root)
+        xp = self.root.winfo_x()+self.root.winfo_width()//2-150
+        yp = self.root.winfo_y()+self.root.winfo_height()//2-130
+        top.geometry(f'+{xp}+{yp}')
+        
+        now = date.today()
+        state = {'y': now.year, 'm': now.month}
+        
+        head = Frame(top, bg=CARD); head.pack(fill=X, padx=8, pady=(8,4))
+        btn_prev = Button(head, text='‹', bg='#eee', relief='flat', padx=4, cursor='hand2',
+                         font=('Microsoft YaHei',10,'bold'))
+        btn_prev.pack(side=LEFT)
+        title_lbl = Label(head, bg=CARD, fg=DARK, font=('Microsoft YaHei',11,'bold'))
+        title_lbl.pack(side=LEFT, expand=True)
+        btn_next = Button(head, text='›', bg='#eee', relief='flat', padx=4, cursor='hand2',
+                         font=('Microsoft YaHei',10,'bold'))
+        btn_next.pack(side=RIGHT)
+        
+        grid = Frame(top, bg=CARD); grid.pack(padx=8, fill=BOTH, expand=True)
+        for ci, d in enumerate(['一','二','三','四','五','六','日']):
+            Label(grid, text=d, bg=CARD, fg='#888', font=('Microsoft YaHei',8), width=4).grid(row=0, column=ci, padx=1, pady=1)
+        
+        def rebuild():
+            nonlocal state
+            for w in grid.winfo_children():
+                if int(w.grid_info()['row']) > 0:
+                    w.destroy()
+            title_lbl.config(text=f'{state["y"]}年{state["m"]}月')
+            import calendar as cal_mod
+            cal = cal_mod.monthcalendar(state['y'], state['m'])
+            today = date.today()
+            for ri, week in enumerate(cal, 1):
+                for ci, d in enumerate(week):
+                    if d == 0: continue
+                    is_today = (state['y']==today.year and state['m']==today.month and d==today.day)
+                    bg = '#1a73e8' if is_today else 'white'; fg = 'white' if is_today else DARK
+                    btn = Button(grid, text=str(d), bg=bg, fg=fg, font=('Microsoft YaHei',9),
+                                relief='flat', width=4, cursor='hand2',
+                                command=lambda dd=d: [entry.delete(0,END), entry.insert(0,f'{state["y"]}-{state["m"]:02d}-{dd:02d}'), top.destroy()])
+                    btn.grid(row=ri, column=ci, padx=1, pady=1)
+        
+        def prev():
+            nonlocal state
+            if state['m'] == 1: state['y'] -= 1; state['m'] = 12
+            else: state['m'] -= 1
+            rebuild()
+        
+        def next_m():
+            nonlocal state
+            if state['m'] == 12: state['y'] += 1; state['m'] = 1
+            else: state['m'] += 1
+            rebuild()
+        
+        btn_prev.config(command=prev)
+        btn_next.config(command=next_m)
+        rebuild()
+    
     def summary_page(self):
         top = Toplevel(self.root); top.title('汇总查询'); top.geometry('800x550')
         top.configure(bg=CARD); top.grab_set()
@@ -937,9 +1001,11 @@ class App:
         ff = Frame(top, bg=CARD); ff.pack(fill=X, padx=16)
         Label(ff, text='起始日期:', bg=CARD, fg='#555', font=('Microsoft YaHei',9)).pack(side=LEFT)
         e_start = Entry(ff, width=12, font=('Microsoft YaHei',10), relief='solid', bd=1)
+        e_start.bind('<Button-1>', lambda e: self.show_calendar(e_start))
         e_start.pack(side=LEFT, padx=(2,8))
         Label(ff, text='结束日期:', bg=CARD, fg='#555', font=('Microsoft YaHei',9)).pack(side=LEFT)
         e_end = Entry(ff, width=12, font=('Microsoft YaHei',10), relief='solid', bd=1)
+        e_end.bind('<Button-1>', lambda e: self.show_calendar(e_end))
         e_end.pack(side=LEFT, padx=(2,8))
         
         workers = get_workers()
