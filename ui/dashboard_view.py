@@ -12,6 +12,7 @@ from services.export_service import export_excel
 from services.process_service import ProcessService
 from ui.dialogs.user_dialog import UserDialog
 from models.record import RecordRepository
+from models.database import Database
 from models.worker import WorkerRepository
 from models.process import ProcessRepository
 from models.record import RecordRepository as StatsRepo
@@ -92,7 +93,7 @@ class DashboardView:
         hdr.pack_propagate(False)
         Label(hdr, text='生产记录管理系统', fg='white', bg=PRIMARY,
               font=('Microsoft YaHei', 16, 'bold')).pack(padx=24, pady=(10, 0), anchor=W)
-        Label(hdr, text='工人 · 工序 · 产量 · 工资 · 动态图表', fg='#b0c4de',
+        Label(hdr, text='工人 · 工序 · 产量 · 工价 · 动态图表', fg='#b0c4de',
               bg=PRIMARY, font=('Microsoft YaHei', 9)).pack(padx=24, pady=(0, 8), anchor=W)
 
         main = Frame(self.root, bg=BG)
@@ -234,7 +235,7 @@ class DashboardView:
                                    show='headings', height=12)
         col_defs = [('id', 'ID', 40), ('material', '物料', 80), ('process', '工序', 100),
                     ('worker', '姓名', 70), ('group', '组别', 70), ('qty', '件数', 60),
-                    ('price', '单价', 60), ('wage', '工资', 70), ('date', '日期', 100)]
+                    ('price', '单价', 60), ('wage', '工价', 70), ('date', '日期', 100)]
         for col, text, w in col_defs:
             self._tree.heading(col, text=text)
             self._tree.column(col, width=w, anchor=CENTER if col in ('id', 'qty', 'price', 'wage') else W)
@@ -316,6 +317,9 @@ class DashboardView:
         except ValueError:
             messagebox.showinfo('提示', '件数必须为数字')
             return
+        if qty <= 0:
+            messagebox.showinfo('提示', '件数必须大于0')
+            return
         widsel = self._worker_ids[wid]
         proc_id = 0
         price = 0
@@ -358,20 +362,24 @@ class DashboardView:
 
         # ── 业务限制：编辑权限 ──
         from datetime import date
+        from models.record import RecordRepository as RR2
         user = self.current_user
         if user:
             role = user.get('role', '')
             # 普通工人只能编辑自己的记录
-            if role == 'worker' and user.get('worker_id'):
+            if role == 'worker':
+                wid = user.get('worker_id')
+                if not wid:
+                    messagebox.showinfo('提示', '您未关联工人，不能编辑记录')
+                    return
                 # 获取记录主人
-                from models.record import RecordRepository as RR2
                 recs = RR2.get_all(user)
                 rec = None
                 for r in recs:
                     if r['id'] == record_id:
                         rec = r
                         break
-                if rec and rec['worker_id'] != user['worker_id']:
+                if rec and rec['worker_id'] != wid:
                     messagebox.showinfo('提示', '您只能编辑自己的记录')
                     return
             # 组长只能编辑本组记录
@@ -660,68 +668,84 @@ class DashboardView:
         from models.record import RecordRepository as RR
         stats = RR.get_stats(user=self.current_user)
         t = stats.get('totals', {})
-
-    def _apply_filter(self):
-        """应用筛选条件"""
-        sd = self._filter_date_from.get().strip()
-        ed = self._filter_date_to.get().strip()
-        wf = self._filter_worker.get() if hasattr(self, '_filter_worker') else '(全部)'
-        pf = self._filter_process.get() if hasattr(self, '_filter_process') else '(全部)'
-
-        # 查询记录
-        self._tree.delete(*self._tree.get_children())
-        conn = Database.get_conn()
-        wh = []
-        pa = []
-        # 用户权限过滤（组长按组，工人按自己）
-        if self.current_user:
-            if self.current_user.get('role') == 'worker' and self.current_user.get('worker_id'):
-                wh.append("r.worker_id=?")
-                pa.append(self.current_user['worker_id'])
-            elif self.current_user.get('role') == 'leader' and self.current_user.get('group_name'):
-                wh.append("r.worker_id IN (SELECT id FROM workers WHERE group_name=?)")
-                pa.append(self.current_user['group_name'])
-        # 筛选条件
-        if sd:
-            wh.append("r.record_date >= ?")
-            pa.append(sd)
-        if ed:
-            wh.append("r.record_date <= ?")
-            pa.append(ed)
-        if wf and wf != '(全部)':
-            wh.append("w.name=?")
-            pa.append(wf)
-        if pf and pf != '(全部)':
-            if ' - ' in pf:
-                mat, proc = pf.split(' - ', 1)
-                wh.append("p.material=? AND p.process_name=?")
-                pa.extend([mat, proc])
-        ws = " WHERE " + " AND ".join(wh) if wh else ""
-        rows = conn.execute(f"""SELECT r.*, w.name AS worker_name, w.group_name,
-                p.material, p.process_name
-                FROM records r
-                LEFT JOIN workers w ON r.worker_id = w.id
-                LEFT JOIN processes p ON r.process_id = p.id
-                {ws}
-                ORDER BY r.id DESC LIMIT 500""", pa).fetchall()
-        for r in rows:
-            wage = r['quantity'] * r['unit_price']
-            self._tree.insert('', END, values=(
-                r['id'], r['material'], r['process_name'], r['worker_name'],
-                r['group_name'], r['quantity'], f'{YEN}{r["unit_price"]}',
-                f'{YEN}{round(wage, 2)}', r['record_date']
-            ))
-            self._tree.item(self._tree.get_children()[-1], tags=(str(r['id']),))
-        # 更新统计
-        from models.record import RecordRepository as RR
-        stats = RR.get_stats(start_date=sd if sd else None, end_date=ed if ed else None,
-                            worker_filter=(next((w for w in WorkerRepository.get_all() if w['name'] == wf), None) or {}).get('id') if wf and wf != '(全部)' else None,
-                            user=self.current_user)
-        t = stats.get('totals', {})
         self._stat_labels['w'].config(text=t.get('w', 0))
         self._stat_labels['q'].config(text=str(t.get('q', 0)))
         self._stat_labels['e'].config(text=f'{YEN}{round(t.get("e", 0), 2)}')
         self._stat_labels['r'].config(text=t.get('r', 0))
+
+    def _apply_filter(self):
+        """应用筛选条件"""
+        try:
+            sd = self._filter_date_from.get().strip()
+            ed = self._filter_date_to.get().strip()
+            wf = self._filter_worker.get() if hasattr(self, '_filter_worker') else '(全部)'
+            pf = self._filter_process.get() if hasattr(self, '_filter_process') else '(全部)'
+
+            # 查询记录
+            self._tree.delete(*self._tree.get_children())
+            conn = Database.get_conn()
+            wh = []
+            pa = []
+            # 用户权限过滤（组长按组，工人按自己）
+            if self.current_user:
+                if self.current_user.get('role') == 'worker' and self.current_user.get('worker_id'):
+                    wh.append("r.worker_id=?")
+                    pa.append(self.current_user['worker_id'])
+                elif self.current_user.get('role') == 'leader' and self.current_user.get('group_name'):
+                    wh.append("r.worker_id IN (SELECT id FROM workers WHERE group_name=?)")
+                    pa.append(self.current_user['group_name'])
+            # 筛选条件
+            if sd:
+                wh.append("r.record_date >= ?")
+                pa.append(sd)
+            if ed:
+                wh.append("r.record_date <= ?")
+                pa.append(ed)
+            if wf and wf != '(全部)':
+                wh.append("w.name=?")
+                pa.append(wf)
+            if pf and pf != '(全部)':
+                if ' - ' in pf:
+                    mat, proc = pf.split(' - ', 1)
+                    wh.append("p.material=? AND p.process_name=?")
+                    pa.extend([mat, proc])
+            ws = " WHERE " + " AND ".join(wh) if wh else ""
+            rows = conn.execute(f"""SELECT r.*, w.name AS worker_name, w.group_name,
+                    p.material, p.process_name
+                    FROM records r
+                    LEFT JOIN workers w ON r.worker_id = w.id
+                    LEFT JOIN processes p ON r.process_id = p.id
+                    {ws}
+                    ORDER BY r.id DESC LIMIT 500""", pa).fetchall()
+            for r in rows:
+                wage = r['quantity'] * r['unit_price']
+                self._tree.insert('', END, values=(
+                    r['id'], r['material'], r['process_name'], r['worker_name'],
+                    r['group_name'], r['quantity'], f'{YEN}{r["unit_price"]}',
+                    f'{YEN}{round(wage, 2)}', r['record_date']
+                ))
+                self._tree.item(self._tree.get_children()[-1], tags=(str(r['id']),))
+            # 更新统计
+            from models.record import RecordRepository as RR
+            from models.worker import WorkerRepository
+            wf_id = None
+            if wf and wf != '(全部)':
+                for w in WorkerRepository.get_all():
+                    if w['name'] == wf:
+                        wf_id = w['id']
+                        break
+            stats = RR.get_stats(start_date=sd if sd else None, end_date=ed if ed else None,
+                                worker_filter=wf_id, user=self.current_user)
+            t = stats.get('totals', {})
+            self._stat_labels['w'].config(text=t.get('w', 0))
+            self._stat_labels['q'].config(text=str(t.get('q', 0)))
+            self._stat_labels['e'].config(text=f'{YEN}{round(t.get("e", 0), 2)}')
+            self._stat_labels['r'].config(text=t.get('r', 0))
+        except Exception as e:
+            logger.error(f'筛选查询失败: {e}', exc_info=True)
+            messagebox.showerror('查询错误', f'筛选时发生错误:\n{e}')
+            # 出错时重新加载数据
+            self._refresh_table()
 
     def _reset_filter(self):
         """重置筛选条件"""
@@ -734,11 +758,6 @@ class DashboardView:
         if hasattr(self, '_filter_process'):
             self._filter_process.set('(全部)')
         self._refresh_table()
-        if self._stat_labels:
-            self._stat_labels['w'].config(text=t.get('w', 0))
-            self._stat_labels['q'].config(text=t.get('q', 0))
-            self._stat_labels['e'].config(text=f'{YEN}{round(t.get("e", 0), 2)}')
-            self._stat_labels['r'].config(text=t.get('r', 0))
 
     # ── Charts ──
     def _open_chart(self):
@@ -781,7 +800,7 @@ class DashboardView:
         tr = ttk.Treeview(top, columns=('name', 'group', 'qty', 'wage'),
                           show='headings', height=10)
         for col, text, w in [('name', '工人', 100), ('group', '组别', 100),
-                              ('qty', '件数', 80), ('wage', '工资', 100)]:
+                              ('qty', '件数', 80), ('wage', '工价', 100)]:
             tr.heading(col, text=text)
             tr.column(col, width=w)
         tr.pack(fill=BOTH, expand=True, padx=10, pady=10)
@@ -843,7 +862,8 @@ class DashboardView:
         self._show_permission_dialog()
 
     def _show_permission_dialog(self):
-        from tkinter import Toplevel, Label, Frame, Canvas, Scrollbar, Checkbutton, IntVar, VERTICAL, HORIZONTAL
+        from tkinter import Toplevel, Label, Frame, Canvas, Scrollbar, Checkbutton, IntVar, VERTICAL, HORIZONTAL, BOTTOM
+        from config import ROLE_NAMES
         top = Toplevel(self.root)
         top.title('权限管理')
         top.geometry('1000x500')
@@ -894,7 +914,9 @@ class DashboardView:
 
         Label(frame, text='用户', bg=CARD, fg=DARK, font=('Microsoft YaHei', 9, 'bold'),
               width=10, anchor='w').grid(row=0, column=0, padx=4, pady=2, sticky='w')
-        for ci, (pk, pl) in enumerate(perm_labels, 1):
+        Label(frame, text='角色', bg=CARD, fg=DARK, font=('Microsoft YaHei', 9, 'bold'),
+              width=8, anchor='w').grid(row=0, column=1, padx=4, pady=2, sticky='w')
+        for ci, (pk, pl) in enumerate(perm_labels, 2):
             Label(frame, text=pl, bg=CARD, fg='#555', font=('Microsoft YaHei', 8),
                   width=7, anchor='w').grid(row=0, column=ci, padx=2, pady=2)
 
@@ -904,8 +926,11 @@ class DashboardView:
             try:
                 Label(frame, text=un, bg=CARD, fg=DARK, font=('Microsoft YaHei', 9),
                       width=10, anchor='w').grid(row=ri, column=0, padx=4, pady=1, sticky='w')
+                role_cn = ROLE_NAMES.get(u.get('role', ''), u.get('role', ''))
+                Label(frame, text=role_cn, bg=CARD, fg='#555', font=('Microsoft YaHei', 9),
+                      width=8, anchor='w').grid(row=ri, column=1, padx=4, pady=1, sticky='w')
                 perms_dict = UserRepository.get_permissions(un)
-                for ci, pk in enumerate(perms, 1):
+                for ci, pk in enumerate(perms, 2):
                     var = IntVar(value=perms_dict.get(pk, 0))
                     self._perm_vars[(un, pk)] = var
                     def make_cmd(u_name, p_key):
@@ -917,7 +942,7 @@ class DashboardView:
                 logger.error(f'加载用户 {un} 的权限失败: {e}')
 
     # ── Calendar ──
-    def _show_calendar(self, entry):
+    def _show_calendar(self, entry, parent=None):
         import calendar as cal_mod
         from tkinter import Toplevel, Button
         top = Toplevel(self.root)
@@ -926,7 +951,7 @@ class DashboardView:
         top.resizable(False, False)
         top.configure(bg=CARD)
         top.grab_set()
-        top.transient(self.root)
+        top.transient(parent or self.root)
         xp = self.root.winfo_x() + self.root.winfo_width() // 2 - 150
         yp = self.root.winfo_y() + self.root.winfo_height() // 2 - 130
         top.geometry(f'+{xp}+{yp}')
@@ -1090,14 +1115,23 @@ class DashboardView:
               font=('Microsoft YaHei', 9)).pack(side=LEFT)
         e_start = Entry(ff, width=12, font=('Microsoft YaHei', 10),
                         relief='solid', bd=1)
-        e_start.bind('<Button-1>', lambda e: self._show_calendar(e_start))
+        e_start.bind('<Button-1>', lambda e: self._show_calendar(e_start, parent=top))
         e_start.pack(side=LEFT, padx=(2, 8))
         Label(ff, text='结束日期:', bg=CARD, fg='#555',
               font=('Microsoft YaHei', 9)).pack(side=LEFT)
         e_end = Entry(ff, width=12, font=('Microsoft YaHei', 10),
                       relief='solid', bd=1)
-        e_end.bind('<Button-1>', lambda e: self._show_calendar(e_end))
+        e_end.bind('<Button-1>', lambda e: self._show_calendar(e_end, parent=top))
         e_end.pack(side=LEFT, padx=(2, 8))
+        # 自动填入当前月份起止日期
+        import calendar as cal_mod
+        from datetime import date as dt_date
+        today = dt_date.today()
+        _, last_day = cal_mod.monthrange(today.year, today.month)
+        e_start.delete(0, END)
+        e_start.insert(0, f'{today.year}-{today.month:02d}-01')
+        e_end.delete(0, END)
+        e_end.insert(0, f'{today.year}-{today.month:02d}-{last_day:02d}')
 
         workers = WorkerRepository.get_all()
         cb_worker = ttk.Combobox(ff, values=['全部'] + [w['name'] for w in workers],
@@ -1113,7 +1147,9 @@ class DashboardView:
             if sel > 0 and sel <= len(workers):
                 wf = workers[sel - 1]['id']
             stats = RR.get_stats(start_date=sd, end_date=ed, worker_filter=wf, user=self.current_user)
-            gen_report(stats, '汇总查询结果')
+            tr.delete(*tr.get_children())
+            for r in stats.get('by_worker', []):
+                tr.insert('', END, values=(r['worker'], r['group_name'], r['q'], round(r['e'], 2)))
 
         Button(ff, text='查询', command=do_query, bg=PRIMARY, fg='white',
                font=('Microsoft YaHei', 9, 'bold'), relief='flat',
@@ -1122,7 +1158,7 @@ class DashboardView:
         tr = ttk.Treeview(top, columns=('worker', 'group', 'qty', 'wage'),
                           show='headings', height=12)
         for col, text, w in [('worker', '工人', 120), ('group', '组别', 120),
-                              ('qty', '件数', 100), ('wage', '工资', 120)]:
+                              ('qty', '件数', 100), ('wage', '工价', 120)]:
             tr.heading(col, text=text)
             tr.column(col, width=w)
         tr.pack(fill=BOTH, expand=True, padx=16, pady=(8, 4))
@@ -1154,9 +1190,19 @@ class DashboardView:
             if export_excel(stats, export_path, title):
                 messagebox.showinfo('成功', f'已导出: {export_path}')
 
+        def do_chart():
+            sd = e_start.get().strip() or None
+            ed = e_end.get().strip() or None
+            wf = None
+            sel = cb_worker.current()
+            if sel > 0 and sel <= len(workers):
+                wf = workers[sel - 1]['id']
+            stats = RR.get_stats(start_date=sd, end_date=ed, worker_filter=wf, user=self.current_user)
+            gen_report(stats, '汇总查询结果')
+
         bf = Frame(top, bg=CARD)
         bf.pack(fill=X, padx=16, pady=(0, 8))
-        Button(bf, text='查询表格', command=do_query_table, bg=PRIMARY, fg='white',
+        Button(bf, text='生成图表', command=do_chart, bg=PRIMARY, fg='white',
                font=('Microsoft YaHei', 9, 'bold'), relief='flat',
                padx=10, cursor='hand2').pack(side=LEFT, padx=(0, 6))
         Button(bf, text='导出 Excel', command=do_export, bg=GREEN, fg='white',

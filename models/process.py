@@ -16,6 +16,9 @@ class ProcessRepository:
 
     @staticmethod
     def add(material: str, process_name: str, unit_price: float) -> bool:
+        if not material or not material.strip() or not process_name or not process_name.strip():
+            logger.warning('添加工序失败: 物料和工序名称不能为空')
+            return False
         conn = Database.get_conn()
         try:
             conn.execute("INSERT INTO processes (material,process_name,unit_price) VALUES (?,?,?)",

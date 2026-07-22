@@ -11,6 +11,9 @@ class MaterialRepository:
 
     @staticmethod
     def add(name: str, price: float = 0) -> bool:
+        if not name or not name.strip():
+            logger.warning('添加物料失败: 名称不能为空')
+            return False
         conn = Database.get_conn()
         try:
             conn.execute("INSERT INTO materials (name,price) VALUES (?,?)", (name, price))
@@ -41,6 +44,15 @@ class MaterialRepository:
     @staticmethod
     def delete(mid: int):
         conn = Database.get_conn()
+        # 获取物料名称，用于级联删除关联工序
+        row = conn.execute("SELECT name FROM materials WHERE id=?", (mid,)).fetchone()
+        if not row:
+            return
+        name = row['name']
+        # 先删除关联工序（及工序的工人分配）
+        for p in conn.execute("SELECT id FROM processes WHERE material=?", (name,)).fetchall():
+            conn.execute("DELETE FROM worker_processes WHERE process_id=?", (p['id'],))
+        conn.execute("DELETE FROM processes WHERE material=?", (name,))
         conn.execute("DELETE FROM materials WHERE id=?", (mid,))
         conn.commit()
-        logger.info(f'删除物料 ID={mid}')
+        logger.info(f'删除物料 ID={mid}，已同步清理关联工序')

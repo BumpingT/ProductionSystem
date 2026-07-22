@@ -66,7 +66,7 @@ class LoginView:
             self.cred_var.set(1)
 
         self.un_entry.focus()
-        self.root.bind('<Return>', lambda e: self._do_login())
+        self.top.bind('<Return>', lambda e: self._do_login())
         self.root.wait_window(self.top)
         return self._result
 
