@@ -1,0 +1,266 @@
+﻿<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>生产管理系统 - 登录与权限设计</title>
+<script src="echarts.min.js"></script>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Noto Sans SC",sans-serif;background:#f0f2f5;color:#2c3e50}
+
+/* Top bar */
+.top{background:linear-gradient(135deg,#1a73e8,#0d47a1);color:#fff;padding:20px 32px}
+.top h1{font-size:20px;font-weight:600}
+.top p{font-size:13px;opacity:.8;margin-top:4px}
+
+/* Main content */
+.c{max-width:1100px;margin:0 auto;padding:20px 24px}
+
+/* Section card */
+.section{background:#fff;border-radius:10px;box-shadow:0 1px 4px rgba(0,0,0,.06);margin-bottom:20px;overflow:hidden}
+.section h2{font-size:15px;font-weight:600;color:#1a73e8;padding:16px 20px 8px;border-bottom:1px solid #f0f0f0}
+.section h3{font-size:13px;font-weight:600;color:#555;padding:14px 20px 6px}
+.section .body{padding:8px 20px 16px}
+
+/* Login mockup */
+.login-mock{max-width:360px;margin:12px auto;background:#f7f8fa;border-radius:8px;padding:24px;border:1px solid #e0e0e0;text-align:center}
+.login-mock h4{font-size:16px;margin-bottom:16px;color:#333}
+.login-mock .field{background:#fff;border:1px solid #ddd;border-radius:6px;padding:10px 14px;margin-bottom:10px;text-align:left;font-size:13px;color:#888}
+.login-mock .field .val{color:#333;float:right;font-size:14px}
+.login-mock .row{display:flex;align-items:center;justify-content:space-between;margin:8px 0 14px;font-size:12px}
+.login-mock .btn{background:#1a73e8;color:#fff;border:none;border-radius:6px;padding:10px 0;width:100%;font-size:14px;cursor:pointer;margin-bottom:12px}
+.login-mock .btn:hover{background:#1557b0}
+.login-mock .note{font-size:11px;color:#999}
+
+/* Flow diagram */
+.flow{display:flex;align-items:center;justify-content:center;gap:8px;margin:12px 0;flex-wrap:wrap}
+.flow .step{background:#e8f0fe;border-radius:8px;padding:10px 16px;font-size:12px;text-align:center;min-width:80px}
+.flow .step .num{display:inline-block;width:20px;height:20px;line-height:20px;border-radius:50%;background:#1a73e8;color:#fff;font-size:10px;margin-bottom:4px}
+.flow .step p{margin-top:2px;color:#555;font-size:11px}
+.flow .arrow{color:#bbb;font-size:18px}
+
+/* Permission grid */
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:8px;margin:8px 0}
+.perm{display:flex;align-items:center;gap:8px;padding:8px 12px;border-radius:6px;background:#f7f8fa;font-size:12px}
+.perm .key{color:#555;flex:1}
+.perm .tag{font-size:10px;padding:2px 6px;border-radius:4px;font-weight:600}
+.tag-admin{background:#1a73e8;color:#fff}
+.tag-default{background:#e8f0fe;color:#1a73e8}
+.tag-admin-only{background:#fce8e6;color:#d93025}
+
+/* User table */
+table{width:100%;border-collapse:collapse;font-size:12px;margin:8px 0}
+th{background:#f7f8fa;text-align:left;padding:8px 10px;font-weight:600;color:#555;border-bottom:2px solid #e8e8e8}
+td{padding:6px 10px;border-bottom:1px solid #f0f0f0}
+.s{display:inline-block;width:32px;height:18px;border-radius:9px;position:relative;background:#ddd;transition:.2s}
+.s.on{background:#34a853}
+.s::after{content:"";position:absolute;width:14px;height:14px;border-radius:50%;background:#fff;top:2px;left:2px;transition:.2s}
+.s.on::after{left:16px}
+.badge{display:inline-block;padding:1px 8px;border-radius:10px;font-size:10px;font-weight:600}
+.badge-admin{background:#1a73e8;color:#fff}
+.badge-user{background:#e8f0fe;color:#1a73e8}
+
+/* Charts */
+.charts{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin:10px 0}
+.chart-box{background:#fff;border:1px solid #f0f0f0;border-radius:8px;padding:10px}
+.chart-box .cb{width:100%;min-height:200px}
+
+/* Info box */
+.info{background:#e8f0fe;border-radius:6px;padding:12px 16px;margin:8px 0;font-size:12px;color:#1a73e8;line-height:1.6}
+.info strong{color:#d93025}
+</style>
+</head>
+<body>
+<div class="top">
+  <h1>生产管理系统 — 登录与权限设计方案</h1>
+  <p>以下为交互式原型设计，确认后整合到 exe 中</p>
+</div>
+<div class="c">
+
+<!-- 1. 登录界面 -->
+<div class="section">
+  <h2>1. 登录界面</h2>
+  <div class="body">
+    <div class="flow">
+      <div class="step"><div class="num">1</div><p>启动 exe</p></div>
+      <div class="arrow">→</div>
+      <div class="step"><div class="num">2</div><p>弹出登录窗</p></div>
+      <div class="arrow">→</div>
+      <div class="step"><div class="num">3</div><p>输入账户密码</p></div>
+      <div class="arrow">→</div>
+      <div class="step"><div class="num">4</div><p>校验通过</p></div>
+      <div class="arrow">→</div>
+      <div class="step"><div class="num">5</div><p>进入主界面</p></div>
+    </div>
+
+    <div class="login-mock">
+      <h4>用户登录</h4>
+      <div class="field">用户名 <span class="val" style="color:#333;font-weight:500">admin</span></div>
+      <div class="field">密码 <span class="val" style="color:#999;font-size:16px">•••••••</span></div>
+      <div class="row">
+        <label><input type="checkbox" checked> 记住密码</label>
+        <span style="color:#999">默认密码: admin123</span>
+      </div>
+      <div class="btn">登 录</div>
+      <div class="note">提示：首访使用默认密码登录后建议立即修改密码</div>
+    </div>
+  </div>
+</div>
+
+<!-- 2. 密码存储 -->
+<div class="section">
+  <h2>2. 密码存储（安全）</h2>
+  <div class="body">
+    <div class="info">
+      <strong>方案：</strong>pbkdf2_hmac (sha256) + 随机盐值<br>
+      <strong>优点：</strong>Python 内置库，无需额外安装；暴力破解成本高<br>
+      <strong>存储字段：</strong><code>password_hash</code>（HEX 字符串）= salt(32位) + hash
+    </div>
+    <table>
+      <tr><th>字段</th><th>说明</th><th>示例</th></tr>
+      <tr><td>username</td><td>登录名，唯一</td><td>admin</td></tr>
+      <tr><td>password_hash</td><td>pbkdf2 结果 (hex)</td><td>a1b2c3... (96位)</td></tr>
+      <tr><td>display_name</td><td>显示名称</td><td>系统管理员</td></tr>
+      <tr><td>role</td><td>角色标识</td><td>admin / worker</td></tr>
+    </table>
+  </div>
+</div>
+
+<!-- 3. 记住密码 -->
+<div class="section">
+  <h2>3. 记住密码</h2>
+  <div class="body">
+    <div class="info">
+      登录成功后，将用户名和加密后的密码写入 exe 同目录的 <code>.login_cred</code> 文件（隐藏文件）。<br>
+      下次启动时自动读取填充，用户只需点"登录"即可。<br>
+      文件内密码使用登录密码的 pbkdf2 哈希 + 一个独立的固定 salt 加密存储。
+    </div>
+  </div>
+</div>
+
+<!-- 4. 用户管理 -->
+<div class="section">
+  <h2>4. 用户管理（admin 专属）</h2>
+  <div class="body">
+    <table>
+      <tr><th>ID</th><th>用户名</th><th>显示名</th><th>角色</th><th>操作</th></tr>
+      <tr><td>1</td><td><b>admin</b></td><td>系统管理员</td><td><span class="badge badge-admin">管理员</span></td><td><span style="color:#999">—</span></td></tr>
+      <tr><td>2</td><td>zhangsan</td><td>张三</td><td><span class="badge badge-user">普通用户</span></td><td><span style="color:#1a73e8;cursor:pointer">编辑</span> <span style="color:#d93025;cursor:pointer">删除</span></td></tr>
+      <tr><td>3</td><td>lisi</td><td>李四</td><td><span class="badge badge-user">普通用户</span></td><td><span style="color:#1a73e8;cursor:pointer">编辑</span> <span style="color:#d93025;cursor:pointer">删除</span></td></tr>
+    </table>
+    <div style="margin:8px 0;display:flex;gap:8px">
+      <span style="background:#e67e22;color:#fff;padding:6px 14px;border-radius:6px;font-size:12px;cursor:pointer">＋ 添加用户</span>
+    </div>
+  </div>
+</div>
+
+<!-- 5. 权限管理 -->
+<div class="section">
+  <h2>5. 权限管理（admin 可配置）</h2>
+  <div class="body">
+    <p style="font-size:12px;color:#666;margin-bottom:10px">admin 在"权限管理"页面可以按开关控制每个用户的功能权限：</p>
+    
+    <div id="permChart" class="chart-box" style="margin-bottom:14px">
+      <div class="cb" id="chPerm"></div>
+    </div>
+
+    <table>
+      <tr><th>权限</th><th>说明</th><th>admin</th><th>张三</th><th>李四</th></tr>
+      <tr><td>添加记录</td><td>record_add</td><td><span class="s on"></span></td><td><span class="s on"></span></td><td><span class="s on"></span></td></tr>
+      <tr><td>删除记录</td><td>record_delete</td><td><span class="s on"></span></td><td><span class="s"></span></td><td><span class="s on"></span></td></tr>
+      <tr><td>编辑记录</td><td>record_edit</td><td><span class="s on"></span></td><td><span class="s"></span></td><td><span class="s on"></span></td></tr>
+      <tr><td>管理物料</td><td>material_manage</td><td><span class="s on"></span></td><td><span class="s"></span></td><td><span class="s"></span></td></tr>
+      <tr><td>管理工人</td><td>worker_manage</td><td><span class="s on"></span></td><td><span class="s"></span></td><td><span class="s"></span></td></tr>
+      <tr><td>管理工序</td><td>process_manage</td><td><span class="s on"></span></td><td><span class="s"></span></td><td><span class="s"></span></td></tr>
+      <tr><td>工人工序分配</td><td>assignment_manage</td><td><span class="s on"></span></td><td><span class="s"></span></td><td><span class="s"></span></td></tr>
+      <tr><td>查看图表</td><td>chart_view</td><td><span class="s on"></span></td><td><span class="s on"></span></td><td><span class="s on"></span></td></tr>
+      <tr><td>查看汇总</td><td>summary_view</td><td><span class="s on"></span></td><td><span class="s on"></span></td><td><span class="s on"></span></td></tr>
+      <tr><td>导出 Excel</td><td>export_excel</td><td><span class="s on"></span></td><td><span class="s on"></span></td><td><span class="s on"></span></td></tr>
+      <tr><td>用户 / 权限管理</td><td>user_manage</td><td><span class="s on"></span></td><td><span class="s"></span></td><td><span class="s"></span></td></tr>
+    </table>
+  </div>
+</div>
+
+<!-- 6. 权限如何控制界面 -->
+<div class="section">
+  <h2>6. 界面控制逻辑</h2>
+  <div class="body">
+    <div class="info">
+      <strong>实现方式：</strong>所有涉及权限的按钮/功能入口统一调用 <code>_check_permission(perm_key)</code><br>
+      无权限时 <code>widget.config(state="disabled")</code> 禁用按钮，不隐藏（用户能看见但不能点）。<br>
+      <strong>例外：</strong>"用户管理"、"权限管理"按钮 <strong>完全隐藏</strong>，只有 admin 账户登录后才显示。
+    </div>
+    <div class="charts">
+      <div class="chart-box">
+        <h3 style="font-size:12px;color:#555;margin-bottom:6px">admin 登录后的主界面</h3>
+        <div style="display:flex;gap:6px;flex-wrap:wrap">
+          <span style="background:#1a73e8;color:#fff;padding:6px 12px;border-radius:6px;font-size:11px">管理物料</span>
+          <span style="background:#1a73e8;color:#fff;padding:6px 12px;border-radius:6px;font-size:11px">管理工人</span>
+          <span style="background:#1a73e8;color:#fff;padding:6px 12px;border-radius:6px;font-size:11px">管理工序</span>
+          <span style="background:#1a73e8;color:#fff;padding:6px 12px;border-radius:6px;font-size:11px">汇总查询</span>
+          <span style="background:#d93025;color:#fff;padding:6px 12px;border-radius:6px;font-size:11px">用户管理</span>
+          <span style="background:#34a853;color:#fff;padding:6px 12px;border-radius:6px;font-size:11px">权限管理</span>
+        </div>
+      </div>
+      <div class="chart-box">
+        <h3 style="font-size:12px;color:#555;margin-bottom:6px">普通用户登录后的主界面</h3>
+        <div style="display:flex;gap:6px;flex-wrap:wrap">
+          <span style="background:#ccc;color:#999;padding:6px 12px;border-radius:6px;font-size:11px;cursor:not-allowed">管理物料</span>
+          <span style="background:#ccc;color:#999;padding:6px 12px;border-radius:6px;font-size:11px;cursor:not-allowed">管理工人</span>
+          <span style="background:#ccc;color:#999;padding:6px 12px;border-radius:6px;font-size:11px;cursor:not-allowed">管理工序</span>
+          <span style="background:#1a73e8;color:#fff;padding:6px 12px;border-radius:6px;font-size:11px">汇总查询</span>
+          <span style="display:none">用户管理</span>
+          <span style="display:none">权限管理</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 7. 数据流 -->
+<div class="section">
+  <h2>7. 数据库表结构</h2>
+  <div class="body">
+  <div class="info">
+    <strong>现有表不变</strong>（materials, workers, processes, worker_processes, records, settings）<br>
+    新增两个表：
+  </div>
+  <table>
+    <tr><th>表名</th><th>字段</th><th>说明</th></tr>
+    <tr><td><code>users</code></td><td>id, username, password_hash, display_name, role, created_at</td><td>用户账户表，role = admin / worker</td></tr>
+    <tr><td><code>user_permissions</code></td><td>id, username, perm_key, allowed (0/1)</td><td>每个用户每条权限一行</td></tr>
+  </table>
+  </div>
+</div>
+
+</div>
+
+<script>
+// Permissions chart
+var users = ["admin","张三","李四"];
+var data = [
+    [1,1,1,1,1,1,1,1,1,1,1],
+    [1,0,0,0,0,0,0,1,1,1,0],
+    [1,1,1,0,0,0,0,1,1,1,0]
+];
+var perms = ["添加记录","删除记录","编辑记录","管理物料","管理工人","管理工序","工序分配","查看图表","查看汇总","导出Excel","用户管理"];
+
+var option = {
+    tooltip:{trigger:"axis",axisPointer:{type:"shadow"}},
+    legend:{data:users,bottom:0},
+    grid:{left:80,right:40,top:10,bottom:40},
+    xAxis:{type:"value",min:0,max:1.2,splitLine:{show:false},axisLabel:{formatter:function(v){return v>=1?"✓":"—"}}},
+    yAxis:{type:"category",data:perms,axisLabel:{fontSize:11}},
+    series:users.map(function(u,i){
+        return {name:u,type:"bar",stack:"total",data:data[i],
+            itemStyle:{color:["#1a73e8","#34a853","#e67e22"][i],borderRadius:[0,4,4,0]},
+            barMaxWidth:16,showBackground:true,backgroundStyle:{color:"#f0f0f0",borderRadius:4},
+            label:{show:true,position:"right",formatter:function(p){return p.value>=1?"✓":""},fontSize:10,color:"#fff"}
+        }
+    })
+};
+echarts.init(document.getElementById("chPerm")).setOption(option);
+</script>
+</body>
+</html>

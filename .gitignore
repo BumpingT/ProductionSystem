@@ -1,0 +1,39 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.spec
+build/
+dist/
+*.exe
+*.pkg
+*.pyz
+
+# IDE
+.idea/
+.vscode/
+
+# CodeGraph
+.codegraph/
+
+# Reasonix
+.reasonix/
+
+# Database
+*.db
+*.db-journal
+*.db-wal
+
+# Credentials
+.login_cred
+
+# Temp / output files
+_hr_err.txt
+_hr_out.txt
+_correct_strings.txt
+_correct_strings_all.txt
+_check_unicode.txt
+_extracted_strings.txt
+_html_strings.txt
+_test_*.txt
+_test_*.py
