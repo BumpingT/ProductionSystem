@@ -770,3 +770,72 @@
 2026-07-22 16:15:07,324 [INFO] prod_sys:20: 数据库已连接: C:\Users\Administrator\Documents\Recording\data.db
 2026-07-22 16:15:07,325 [INFO] prod_sys:109: 数据库初始化完成
 2026-07-22 16:15:07,326 [INFO] prod_sys:28: 数据库已关闭
+2026-07-22 16:19:07,405 [INFO] prod_sys:20: 数据库已连接: C:\Users\Administrator\Documents\Recording\data.db
+2026-07-22 16:19:07,405 [INFO] prod_sys:109: 数据库初始化完成
+2026-07-22 16:19:07,422 [INFO] prod_sys:18: 用户 admin 登录成功
+2026-07-22 16:19:07,423 [INFO] prod_sys:28: 数据库已关闭
+2026-07-22 16:19:07,426 [INFO] prod_sys:20: 数据库已连接: C:\Users\Administrator\Documents\Recording\data.db
+2026-07-22 16:19:07,426 [INFO] prod_sys:109: 数据库初始化完成
+2026-07-22 16:19:07,444 [WARNING] prod_sys:16: 登录失败：用户 admin 密码错误
+2026-07-22 16:19:07,445 [INFO] prod_sys:28: 数据库已关闭
+2026-07-22 16:19:07,447 [INFO] prod_sys:20: 数据库已连接: C:\Users\Administrator\Documents\Recording\data.db
+2026-07-22 16:19:07,448 [INFO] prod_sys:109: 数据库初始化完成
+2026-07-22 16:19:07,448 [WARNING] prod_sys:13: 登录失败：用户 nonexistent 不存在
+2026-07-22 16:19:07,449 [INFO] prod_sys:28: 数据库已关闭
+2026-07-22 16:19:07,451 [INFO] prod_sys:20: 数据库已连接: C:\Users\Administrator\Documents\Recording\data.db
+2026-07-22 16:19:07,452 [INFO] prod_sys:109: 数据库初始化完成
+2026-07-22 16:19:07,452 [WARNING] prod_sys:13: 登录失败：用户  不存在
+2026-07-22 16:19:07,453 [INFO] prod_sys:28: 数据库已关闭
+2026-07-22 16:19:07,455 [INFO] prod_sys:20: 数据库已连接: C:\Users\Administrator\Documents\Recording\data.db
+2026-07-22 16:19:07,456 [INFO] prod_sys:109: 数据库初始化完成
+2026-07-22 16:19:07,473 [WARNING] prod_sys:16: 登录失败：用户 admin 密码错误
+2026-07-22 16:19:07,474 [INFO] prod_sys:28: 数据库已关闭
+2026-07-22 16:19:07,476 [INFO] prod_sys:20: 数据库已连接: C:\Users\Administrator\Documents\Recording\data.db
+2026-07-22 16:19:07,476 [INFO] prod_sys:109: 数据库初始化完成
+2026-07-22 16:19:07,513 [INFO] prod_sys:51: 用户 admin 密码已修改
+2026-07-22 16:19:07,513 [INFO] prod_sys:32: 用户 admin 密码已修改
+2026-07-22 16:19:07,530 [INFO] prod_sys:18: 用户 admin 登录成功
+2026-07-22 16:19:07,547 [WARNING] prod_sys:16: 登录失败：用户 admin 密码错误
+2026-07-22 16:19:07,581 [INFO] prod_sys:51: 用户 admin 密码已修改
+2026-07-22 16:19:07,582 [INFO] prod_sys:32: 用户 admin 密码已修改
+2026-07-22 16:19:07,583 [INFO] prod_sys:28: 数据库已关闭
+2026-07-22 16:19:07,587 [INFO] prod_sys:20: 数据库已连接: C:\Users\Administrator\Documents\Recording\data.db
+2026-07-22 16:19:07,587 [INFO] prod_sys:109: 数据库初始化完成
+2026-07-22 16:19:07,606 [INFO] prod_sys:28: 数据库已关闭
+2026-07-22 16:19:07,609 [INFO] prod_sys:20: 数据库已连接: C:\Users\Administrator\Documents\Recording\data.db
+2026-07-22 16:19:07,609 [INFO] prod_sys:109: 数据库初始化完成
+2026-07-22 16:19:07,627 [INFO] prod_sys:28: 数据库已关闭
+2026-07-22 16:19:07,630 [INFO] prod_sys:20: 数据库已连接: C:\Users\Administrator\Documents\Recording\data.db
+2026-07-22 16:19:07,630 [INFO] prod_sys:109: 数据库初始化完成
+2026-07-22 16:19:07,631 [INFO] prod_sys:28: 数据库已关闭
+2026-07-22 16:19:07,633 [INFO] prod_sys:20: 数据库已连接: C:\Users\Administrator\Documents\Recording\data.db
+2026-07-22 16:19:07,633 [INFO] prod_sys:109: 数据库初始化完成
+2026-07-22 16:19:07,634 [INFO] prod_sys:28: 数据库已关闭
+2026-07-22 16:19:07,636 [INFO] prod_sys:20: 数据库已连接: C:\Users\Administrator\Documents\Recording\data.db
+2026-07-22 16:19:07,636 [INFO] prod_sys:109: 数据库初始化完成
+2026-07-22 16:19:07,654 [INFO] prod_sys:18: 用户 admin 登录成功
+2026-07-22 16:19:07,655 [INFO] prod_sys:28: 数据库已关闭
+2026-07-22 16:19:07,658 [INFO] prod_sys:20: 数据库已连接: C:\Users\Administrator\Documents\Recording\data.db
+2026-07-22 16:19:07,658 [INFO] prod_sys:109: 数据库初始化完成
+2026-07-22 16:19:07,659 [INFO] prod_sys:28: 数据库已关闭
+2026-07-22 16:19:07,662 [INFO] prod_sys:20: 数据库已连接: C:\Users\Administrator\Documents\Recording\data.db
+2026-07-22 16:19:07,662 [INFO] prod_sys:109: 数据库初始化完成
+2026-07-22 16:19:07,663 [INFO] prod_sys:28: 数据库已关闭
+2026-07-22 16:19:07,665 [INFO] prod_sys:20: 数据库已连接: C:\Users\Administrator\Documents\Recording\data.db
+2026-07-22 16:19:07,665 [INFO] prod_sys:109: 数据库初始化完成
+2026-07-22 16:19:07,666 [INFO] prod_sys:28: 数据库已关闭
+2026-07-22 16:19:07,669 [INFO] prod_sys:20: 数据库已连接: C:\Users\Administrator\Documents\Recording\data.db
+2026-07-22 16:19:07,669 [INFO] prod_sys:109: 数据库初始化完成
+2026-07-22 16:19:07,670 [INFO] prod_sys:28: 数据库已关闭
+2026-07-22 16:19:07,672 [INFO] prod_sys:20: 数据库已连接: C:\Users\Administrator\Documents\Recording\data.db
+2026-07-22 16:19:07,672 [INFO] prod_sys:109: 数据库初始化完成
+2026-07-22 16:19:07,673 [INFO] prod_sys:28: 数据库已关闭
+2026-07-22 16:19:07,676 [INFO] prod_sys:20: 数据库已连接: C:\Users\Administrator\Documents\Recording\data.db
+2026-07-22 16:19:07,676 [INFO] prod_sys:109: 数据库初始化完成
+2026-07-22 16:19:07,677 [INFO] prod_sys:28: 数据库已关闭
+2026-07-22 16:19:07,679 [INFO] prod_sys:20: 数据库已连接: C:\Users\Administrator\Documents\Recording\data.db
+2026-07-22 16:19:07,679 [INFO] prod_sys:109: 数据库初始化完成
+2026-07-22 16:19:07,680 [INFO] prod_sys:28: 数据库已关闭
+2026-07-22 16:19:07,683 [INFO] prod_sys:20: 数据库已连接: C:\Users\Administrator\Documents\Recording\data.db
+2026-07-22 16:19:07,683 [INFO] prod_sys:109: 数据库初始化完成
+2026-07-22 16:19:07,684 [INFO] prod_sys:28: 数据库已关闭

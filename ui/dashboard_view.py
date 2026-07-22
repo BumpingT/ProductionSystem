@@ -321,6 +321,36 @@ class DashboardView:
             return
         record_id = int(vals[0])
 
+        # ── 业务限制：编辑权限 ──
+        from datetime import date
+        user = self.current_user
+        if user:
+            role = user.get('role', '')
+            # 普通工人只能编辑自己的记录
+            if role == 'worker' and user.get('worker_id'):
+                # 获取记录主人
+                from models.record import RecordRepository as RR2
+                recs = RR2.get_all(user)
+                rec = None
+                for r in recs:
+                    if r['id'] == record_id:
+                        rec = r
+                        break
+                if rec and rec['worker_id'] != user['worker_id']:
+                    messagebox.showinfo('提示', '您只能编辑自己的记录')
+                    return
+            # 组长只能编辑本组记录
+            if role == 'leader' and user.get('group_name'):
+                recs = RR2.get_all(user)
+                rec = None
+                for r in recs:
+                    if r['id'] == record_id:
+                        rec = r
+                        break
+                if not rec:
+                    messagebox.showinfo('提示', '您只能编辑本组工人的记录')
+                    return
+
         # 从数据库重新获取完整记录
         records = RecordRepository.get_all(self.current_user)
         record = None
@@ -526,17 +556,40 @@ class DashboardView:
 
     # ── Refresh ──
     def refresh(self):
+        # 组长只能看到本组工人
+        is_leader = self.current_user and self.current_user.get('role') == 'leader' and self.current_user.get('group_name')
+        leader_group = self.current_user.get('group_name', '') if is_leader else None
+
+        if leader_group:
+            all_workers = [w for w in WorkerRepository.get_all() if w.get('group_name') == leader_group]
+        else:
+            all_workers = WorkerRepository.get_all()
+
         # Load workers and processes
         self._worker_ids = []
         self._worker_procs = {}
-        for w in WorkerRepository.get_all():
+        for w in all_workers:
             self._worker_ids.append(w['id'])
             assigned_ids = ProcessService.get_worker_processes(w['id'])
             procs = [p for p in ProcessRepository.get_all() if p['id'] in assigned_ids]
             self._worker_procs[w['id']] = procs
 
         if hasattr(self, 'cb_worker') and self.cb_worker:
-            self.cb_worker['values'] = [w['name'] for w in WorkerRepository.get_all()]
+            self.cb_worker['values'] = [w['name'] for w in all_workers]
+            # 普通工人只能选自己
+            if self.current_user and self.current_user.get('role') == 'worker' and self.current_user.get('worker_id'):
+                worker_name = ''
+                for w in all_workers:
+                    if w['id'] == self.current_user['worker_id']:
+                        worker_name = w['name']
+                        break
+                if worker_name:
+                    self.cb_worker.set(worker_name)
+                    self.cb_worker.config(state='disabled')
+                else:
+                    self.cb_worker.config(state='readonly')
+            else:
+                self.cb_worker.config(state='readonly')
 
         # Refresh table
         self._refresh_table()
@@ -597,7 +650,7 @@ class DashboardView:
                 return
             y, mo = int(m.split('-')[0]), int(m.split('-')[1])
             _, ld = cal_mod.monthrange(y, mo)
-            stats = RecordRepository.get_stats(start_date=f'{m}-01', end_date=f'{y}-{mo:02d}-{ld:02d}')
+            stats = RecordRepository.get_stats(start_date=f'{m}-01', end_date=f'{y}-{mo:02d}-{ld:02d}', user=self.current_user)
             gen_report(stats, f'{m} 月度汇总')
 
         Button(top, text='生成报告', command=do_report, bg=PRIMARY, fg='white',
@@ -619,7 +672,7 @@ class DashboardView:
                 return
             y, mo = int(m.split('-')[0]), int(m.split('-')[1])
             _, ld = cal_mod.monthrange(y, mo)
-            stats = RecordRepository.get_stats(start_date=f'{m}-01', end_date=f'{y}-{mo:02d}-{ld:02d}')
+            stats = RecordRepository.get_stats(start_date=f'{m}-01', end_date=f'{y}-{mo:02d}-{ld:02d}', user=self.current_user)
             for r in stats.get('by_worker', []):
                 tr.insert('', END, values=(r['worker'], r['group_name'], r['q'], round(r['e'], 2)))
 
@@ -633,7 +686,7 @@ class DashboardView:
                 return
             y, mo = int(m.split('-')[0]), int(m.split('-')[1])
             _, ld = cal_mod.monthrange(y, mo)
-            stats = RecordRepository.get_stats(start_date=f'{m}-01', end_date=f'{y}-{mo:02d}-{ld:02d}')
+            stats = RecordRepository.get_stats(start_date=f'{m}-01', end_date=f'{y}-{mo:02d}-{ld:02d}', user=self.current_user)
             path = os.path.join(_BASE, f'月度汇总_{m}.xlsx')
             if export_excel(stats, path, f'{m} 月度汇总'):
                 messagebox.showinfo('成功', f'已导出: {path}')
@@ -938,7 +991,7 @@ class DashboardView:
             sel = cb_worker.current()
             if sel > 0 and sel <= len(workers):
                 wf = workers[sel - 1]['id']
-            stats = RR.get_stats(start_date=sd, end_date=ed, worker_filter=wf)
+            stats = RR.get_stats(start_date=sd, end_date=ed, worker_filter=wf, user=self.current_user)
             gen_report(stats, '汇总查询结果')
 
         Button(ff, text='查询', command=do_query, bg=PRIMARY, fg='white',
@@ -960,7 +1013,7 @@ class DashboardView:
             sel = cb_worker.current()
             if sel > 0 and sel <= len(workers):
                 wf = workers[sel - 1]['id']
-            stats = RR.get_stats(start_date=sd, end_date=ed, worker_filter=wf)
+            stats = RR.get_stats(start_date=sd, end_date=ed, worker_filter=wf, user=self.current_user)
             tr.delete(*tr.get_children())
             for r in stats.get('by_worker', []):
                 tr.insert('', END, values=(r['worker'], r['group_name'], r['q'], round(r['e'], 2)))
@@ -972,7 +1025,7 @@ class DashboardView:
             sel = cb_worker.current()
             if sel > 0 and sel <= len(workers):
                 wf = workers[sel - 1]['id']
-            stats = RR.get_stats(start_date=sd, end_date=ed, worker_filter=wf)
+            stats = RR.get_stats(start_date=sd, end_date=ed, worker_filter=wf, user=self.current_user)
             export_path = os.path.join(_BASE, '汇总查询.xlsx')
             title = '汇总查询'
             if sd or ed:

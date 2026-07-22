@@ -6,23 +6,24 @@ class RecordRepository:
     @staticmethod
     def get_all(user: dict = None) -> list[dict]:
         conn = Database.get_conn()
-        if user and user.get('role') == 'worker' and user.get('worker_id'):
-            rows = conn.execute("""
-                SELECT r.*, w.name AS worker_name, w.group_name,
+        base_sql = """SELECT r.*, w.name AS worker_name, w.group_name,
                        p.material, p.process_name
                 FROM records r
                 LEFT JOIN workers w ON r.worker_id = w.id
-                LEFT JOIN processes p ON r.process_id = p.id
+                LEFT JOIN processes p ON r.process_id = p.id"""
+
+        if user and user.get('role') == 'worker' and user.get('worker_id'):
+            rows = conn.execute(base_sql + """
                 WHERE r.worker_id = ?
                 ORDER BY r.id DESC LIMIT 500
             """, (user['worker_id'],)).fetchall()
+        elif user and user.get('role') == 'leader' and user.get('group_name'):
+            rows = conn.execute(base_sql + """
+                WHERE w.group_name = ?
+                ORDER BY r.id DESC LIMIT 500
+            """, (user['group_name'],)).fetchall()
         else:
-            rows = conn.execute("""
-                SELECT r.*, w.name AS worker_name, w.group_name,
-                       p.material, p.process_name
-                FROM records r
-                LEFT JOIN workers w ON r.worker_id = w.id
-                LEFT JOIN processes p ON r.process_id = p.id
+            rows = conn.execute(base_sql + """
                 ORDER BY r.id DESC LIMIT 500
             """).fetchall()
         return [dict(r) for r in rows]
@@ -56,10 +57,15 @@ class RecordRepository:
 
     @staticmethod
     def get_stats(start_date: str = None, end_date: str = None,
-                  process_filter: int = None, worker_filter: int = None) -> dict:
+                  process_filter: int = None, worker_filter: int = None,
+                  user: dict = None) -> dict:
         conn = Database.get_conn()
         wh = []
         pa = []
+        # 组长只能看本组数据（用子查询避免 JOIN 别名冲突）
+        if user and user.get('role') == 'leader' and user.get('group_name'):
+            wh.append("r.worker_id IN (SELECT id FROM workers WHERE group_name=?)")
+            pa.append(user['group_name'])
         if start_date:
             wh.append("r.record_date >= ?")
             pa.append(start_date)
