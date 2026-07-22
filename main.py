@@ -589,10 +589,6 @@ class App:
         Button(bt, text='退出登录', bg=DARK, fg='white', font=('Microsoft YaHei',9,'bold'),
                relief='flat', padx=10, pady=2, cursor='hand2', command=self._logout).pack(side=RIGHT, padx=(4,4))
     
-    @property
-    def hidden_btn(self):
-        return None
-    
     def _logout(self):
         if messagebox.askyesno('确认', '确定退出登录？'):
             self.root.withdraw()
