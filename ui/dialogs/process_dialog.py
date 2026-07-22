@@ -1,31 +1,153 @@
 """
-工序管理对话框
+工序管理对话框 — 含工人分配功能
 """
+from tkinter import Toplevel, Label, Frame, Button, Entry, ttk, END, W, Checkbutton, IntVar
 from tkinter import messagebox
+from config import CARD, DARK, ACCENT, RED, GREEN, PRIMARY
 from models.process import ProcessRepository
-from ui.widgets.crud_dialog_base import CrudDialogBase
+from models.worker import WorkerRepository
+from models.record import RecordRepository
 
 
-class ProcessDialog(CrudDialogBase):
+class ProcessDialog:
     def __init__(self, parent):
-        super().__init__(
-            parent=parent,
-            title='管理工序',
-            geometry='600x450',
-            columns=[('material', '物料', 130), ('process', '工序', 200), ('price', '单价', 80)],
-            add_fields=[('物料', 10), ('工序', 12), ('单价', 6)]
-        )
+        self.parent = parent
+        self.top = Toplevel(parent)
+        self.top.title('管理工序')
+        self.top.geometry('750x550')
+        self.top.configure(bg=CARD)
+        self.top.grab_set()
+
+        Label(self.top, text='工序列表', font=('Microsoft YaHei', 12, 'bold'),
+              bg=CARD, fg=DARK).pack(anchor=W, padx=16, pady=(10, 4))
+
+        # ── 工序列表 ──
+        self.tree = ttk.Treeview(self.top, columns=('material', 'process', 'price'),
+                                  show='headings', height=8)
+        self.tree.heading('material', text='物料')
+        self.tree.heading('process', text='工序')
+        self.tree.heading('price', text='单价')
+        self.tree.column('material', width=130)
+        self.tree.column('process', width=200)
+        self.tree.column('price', width=80)
+        self.tree.pack(fill='x', padx=16)
+        self.tree.bind('<<TreeviewSelect>>', self._on_select)
+
+        # ── 添加/删除区域 ──
+        f = Frame(self.top, bg=CARD)
+        f.pack(fill='x', padx=16, pady=4)
+        self.e_material = Entry(f, width=10, font=('Microsoft YaHei', 11), relief='solid', bd=1)
+        self.e_material.pack(side='left', padx=(0, 4))
+        self._ph(self.e_material, '物料')
+        self.e_process = Entry(f, width=12, font=('Microsoft YaHei', 11), relief='solid', bd=1)
+        self.e_process.pack(side='left', padx=(0, 4))
+        self._ph(self.e_process, '工序')
+        self.e_price = Entry(f, width=6, font=('Microsoft YaHei', 11), relief='solid', bd=1)
+        self.e_price.pack(side='left', padx=(0, 4))
+        self._ph(self.e_price, '单价')
+
+        Button(f, text='添加', bg=ACCENT, fg='white', font=('Microsoft YaHei', 9, 'bold'),
+               relief='flat', padx=8, cursor='hand2', command=self._on_add).pack(side='left')
+        Button(f, text='删除', bg=RED, fg='white', font=('Microsoft YaHei', 9, 'bold'),
+               relief='flat', padx=8, cursor='hand2', command=self._on_delete).pack(side='left', padx=(4, 0))
+
+        # ── 工人分配区域 ──
+        assign_frame = Frame(self.top, bg=CARD, highlightbackground='#ddd', highlightthickness=1)
+        assign_frame.pack(fill='both', expand=True, padx=16, pady=(8, 8))
+
+        Label(assign_frame, text='工人分配（选中工序后操作）', font=('Microsoft YaHei', 10, 'bold'),
+              bg=CARD, fg=DARK).pack(anchor=W, padx=12, pady=(8, 2))
+
+        self.assign_info = Label(assign_frame, text='请选中一个工序', bg=CARD, fg='#888',
+                                 font=('Microsoft YaHei', 9))
+        self.assign_info.pack(anchor=W, padx=12)
+
+        # Scrollable worker list
+        import tkinter as tk
+        canvas = tk.Canvas(assign_frame, bg=CARD, highlightthickness=0)
+        vsb = ttk.Scrollbar(assign_frame, orient='vertical', command=canvas.yview)
+        canvas.configure(yscrollcommand=vsb.set)
+
+        self.worker_frame = Frame(canvas, bg=CARD)
+        canvas.create_window((0, 0), window=self.worker_frame, anchor='nw')
+        self.worker_frame.bind('<Configure>', lambda e: canvas.configure(scrollregion=canvas.bbox('all')))
+
+        canvas.pack(side='left', fill='both', expand=True, padx=(12, 0), pady=(0, 8))
+        vsb.pack(side='right', fill='y', pady=(0, 8))
+
+        self.selected_process_id = None
+        self._worker_vars = {}
+        self.refresh()
+
+    def _ph(self, entry, text):
+        entry._ph_text = text
+        entry.insert(0, text)
+        entry.config(fg='#999999')
+        def _in(e):
+            if entry.get() == entry._ph_text:
+                entry.delete(0, END)
+                entry.config(fg='#333333')
+        def _out(e):
+            if not entry.get().strip():
+                entry.insert(0, entry._ph_text)
+                entry.config(fg='#999999')
+        entry.bind('<FocusIn>', _in, '+')
+        entry.bind('<FocusOut>', _out, '+')
 
     def refresh(self):
         self.tree.delete(*self.tree.get_children())
         for p in ProcessRepository.get_all():
             self.tree.insert('', 'end', iid=str(p['id']),
                            values=(p['material'], p['process_name'], p['unit_price']))
+        self._refresh_workers()
 
-    def on_add(self):
-        material = self.get_entry_value('物料')
-        process = self.get_entry_value('工序')
-        price_str = self.get_entry_value('单价')
+    def _refresh_workers(self):
+        """刷新工人分配列表"""
+        for w in self.worker_frame.winfo_children():
+            w.destroy()
+        self._worker_vars = {}
+
+        if not self.selected_process_id:
+            self.assign_info.config(text='请选中一个工序')
+            return
+
+        assigned_ids = RecordRepository.get_worker_processes(self.selected_process_id)
+        self.assign_info.config(
+            text=f'已分配 {len(assigned_ids)} 个工人，勾选/取消勾选以分配')
+
+        for w in WorkerRepository.get_all():
+            var = IntVar(value=1 if w['id'] in assigned_ids else 0)
+            self._worker_vars[w['id']] = var
+
+            def make_cmd(wid, pid):
+                return lambda: self._toggle_worker(wid, pid)
+
+            cb = Checkbutton(self.worker_frame, text=f"{w['name']} ({w['group_name']})",
+                           variable=var, bg=CARD, font=('Microsoft YaHei', 9),
+                           command=make_cmd(w['id'], self.selected_process_id))
+            cb.pack(anchor=W, padx=8, pady=1)
+
+    def _toggle_worker(self, worker_id, process_id):
+        """切换工人工序分配"""
+        if self._worker_vars.get(worker_id, IntVar()).get():
+            RecordRepository.assign_worker_process(worker_id, process_id)
+        else:
+            RecordRepository.unassign_worker_process(worker_id, process_id)
+
+    def _on_select(self, ev):
+        sel = self.tree.selection()
+        if sel:
+            self.selected_process_id = int(sel[0])
+        else:
+            self.selected_process_id = None
+        self._refresh_workers()
+
+    def _on_add(self):
+        material = self.e_material.get().strip()
+        process = self.e_process.get().strip()
+        price_str = self.e_price.get().strip()
+        if material == getattr(self.e_material, '_ph_text', None): material = ''
+        if process == getattr(self.e_process, '_ph_text', None): process = ''
         if not material or not process:
             messagebox.showinfo('提示', '请输入物料和工序名称')
             return
@@ -35,13 +157,19 @@ class ProcessDialog(CrudDialogBase):
             messagebox.showinfo('提示', '单价必须为数字')
             return
         if ProcessRepository.add(material, process, price):
+            self.e_material.delete(0, END)
+            self.e_process.delete(0, END)
+            self.e_price.delete(0, END)
             self.refresh()
-            self.clear_entries()
         else:
             messagebox.showinfo('提示', '工序已存在')
 
-    def _on_delete_selected(self, item):
-        vals = self.tree.item(item, 'values')
+    def _on_delete(self):
+        sel = self.tree.selection()
+        if not sel:
+            return
+        vals = self.tree.item(sel[0], 'values')
         if messagebox.askyesno('确认', f'删除工序 "{vals[1]}"？'):
-            ProcessRepository.delete(int(item))
+            ProcessRepository.delete(int(sel[0]))
+            self.selected_process_id = None
             self.refresh()
