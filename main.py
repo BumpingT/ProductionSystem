@@ -76,77 +76,14 @@ get_all_records = RecordRepository.get_all
 get_stats = RecordRepository.get_stats
 list_months = RecordRepository.list_months
 
+# ── 服务层 ──
+from services.chart_service import _chart_html, gen_report
+from services.export_service import export_excel
+
 # ── 基本路径 ──
 if getattr(sys, "frozen", False): _BASE = os.path.dirname(sys.executable)
 else: _BASE = os.path.dirname(os.path.abspath(__file__))
 
-
-def _chart_html(stats, title=''):
-    t = stats['totals']; w = stats['by_worker']; d = stats['by_date']; p = stats['by_process']
-    wj = json.dumps([x['q'] for x in w])
-    dj = json.dumps([x['q'] for x in d])
-    pj = json.dumps([x['q'] for x in p])
-    return f'''<!DOCTYPE html><html><head><meta charset="utf-8"><script src="echarts.min.js"></script>
-<style>*{{margin:0;padding:0;box-sizing:border-box}}body{{font-family:Microsoft YaHei,sans-serif;background:#f0f2f5;padding:20px}}
-.sr{{display:flex;gap:12px;margin-bottom:16px}}
-.sc{{flex:1;background:#fff;border-radius:8px;padding:14px;text-align:center;box-shadow:0 1px 3px rgba(0,0,0,.06)}}
-.l{{font-size:12px;color:#888}} .v{{font-size:20px;font-weight:700;color:#2c3e50;margin-top:4px}}
-.o{{font-size:11px;color:#27ae60}} .cc{{background:#fff;border-radius:8px;padding:14px;margin-bottom:14px;box-shadow:0 1px 3px rgba(0,0,0,.06)}}
-.cb{{width:100%;min-height:220px}} table{{width:100%;border-collapse:collapse;font-size:12px}}
-th{{background:#f7f8fa;padding:6px 8px;text-align:left;border-bottom:2px solid #e8e8e8}}
-td{{padding:5px 8px;border-bottom:1px solid #f0f0f0}} h3{{font-size:13px;color:#555;margin-bottom:8px}}
-</style></head><body>
-<h2 style="margin-bottom:12px">{title}</h2>
-<div class="sr"><div class="sc"><div class="l">工人数</div><div class="v">{t["w"]}</div></div>
-<div class="sc"><div class="l">总产量</div><div class="v">{t["q"]}</div></div>
-<div class="sc"><div class="l">总工价</div><div class="v">{YEN}{round(t["e"],2)}</div></div>
-<div class="sc"><div class="l">记录数</div><div class="v">{t["r"]}</div></div></div>
-<div class="cc"><h3>工人工资排行</h3><div id="w" class="cb"></div></div>
-<div class="cc"><h3>日产量趋势</h3><div id="d" class="cb"></div></div>
-<div class="cc"><h3>工序产量分布</h3><div id="p" class="cb"></div></div>
-<script>
-var wc=echarts.init(document.getElementById("w"));wc.setOption({{title:{{show:false}},tooltip:{{trigger:"axis",axisPointer:{{type:"shadow"}}}},xAxis:{{type:"value"}},yAxis:{{type:"category",data:{[x["worker"] for x in w]}}},series:[{{type:"bar",data:{wj},itemStyle:{{color:"#1a73e8",borderRadius:[0,4,4,0]}}}}]}});
-var dc=echarts.init(document.getElementById("d"));dc.setOption({{title:{{show:false}},tooltip:{{trigger:"axis"}},xAxis:{{type:"category",data:{[x["record_date"] for x in d]}}},yAxis:{{type:"value"}},series:[{{type:"line",data:{[x["q"] for x in d]},smooth:true,lineStyle:{{color:"#27ae60"}},areaStyle:{{color:"#27ae60",opacity:.15}}}}]}});
-var pc=echarts.init(document.getElementById("p"));pc.setOption({{title:{{show:false}},tooltip:{{trigger:"axis",axisPointer:{{type:"shadow"}}}},xAxis:{{type:"value"}},yAxis:{{type:"category",data:{[x["material"]+'-'+x["process_name"] for x in p]}}},series:[{{type:"bar",data:{pj},itemStyle:{{color:"#e67e22",borderRadius:[0,4,4,0]}}}}]}});
-</script></body></html>'''
-
-def gen_report(stats, title='生产记录'):
-    html = _chart_html(stats, title)
-    path = os.path.join(tempfile.gettempdir(), 'report.html')
-    with open(path, 'w', encoding='utf-8') as f: f.write(html)
-    # Copy echarts to temp
-    if os.path.exists(ECHARTS_PATH):
-        shutil.copy(ECHARTS_PATH, os.path.join(tempfile.gettempdir(), 'echarts.min.js'))
-    webbrowser.open('file://' + path)
-
-def export_excel(stats, filepath, title=''):
-    try:
-        import openpyxl
-        from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
-    except ImportError:
-        messagebox.showinfo('提示', '请先安装 openpyxl: pip install openpyxl')
-        return False
-    wb = openpyxl.Workbook(); ws = wb.active
-    title = title or '生产记录'
-    ws.cell(row=1, column=1, value=title).font = Font(bold=True, size=13)
-    ws.merge_cells('A1:H1')
-    t = stats.get('totals', {})
-    ws.cell(row=2, column=1, value=f'工人数: {t.get("w",0)}  |  总产量: {t.get("q",0)}  |  总工资: {YEN}{round(t.get("e",0),2)}')
-    headers = ['工人', '组别', '件数', '工资']
-    for ci, h in enumerate(headers, 1):
-        cell = ws.cell(row=4, column=ci, value=h)
-        cell.font = Font(bold=True, color='00ffffff')
-        cell.fill = PatternFill('solid', fgColor='001a73e8')
-        cell.alignment = Alignment(horizontal='center')
-    for ri, r in enumerate(stats.get('by_worker',[]), 5):
-        ws.cell(row=ri, column=1, value=r.get('worker',''))
-        ws.cell(row=ri, column=2, value=r.get('group_name',''))
-        ws.cell(row=ri, column=3, value=r.get('q',0))
-        ws.cell(row=ri, column=4, value=round(r.get('e',0),2))
-    wb.save(filepath)
-    return True
-
-# ── App ──
 
 class App:
     def __init__(self):
