@@ -1,0 +1,749 @@
+"""
+主面板视图 — 工具栏、记录表单、统计栏、数据表格、底部操作栏
+"""
+from tkinter import Frame, Label, Button, Entry, ttk, Scrollbar, VERTICAL, END, BOTH, X, Y, LEFT, RIGHT, W, CENTER
+from tkinter import messagebox
+from datetime import date
+import os
+
+from config import BG, CARD, PRIMARY, ACCENT, GREEN, RED, DARK, YEN, _BASE
+from services.chart_service import gen_report
+from services.export_service import export_excel
+from models.record import RecordRepository
+from models.worker import WorkerRepository
+from models.process import ProcessRepository
+from models.record import RecordRepository as StatsRepo
+from models.user import UserRepository
+from ui.dialogs.material_dialog import MaterialDialog
+from ui.dialogs.worker_dialog import WorkerDialog
+from ui.dialogs.process_dialog import ProcessDialog
+from utils.auth import hash_password as _hash_pw, verify_password as _verify_pw
+from utils.logger import logger
+
+
+class DashboardView:
+    def __init__(self, root, current_user, user_perms):
+        self.root = root
+        self.current_user = current_user
+        self.user_perms = user_perms
+        self._perm_widgets = []
+        self._worker_ids = []
+        self._worker_procs = {}
+        self._tree = None
+        self._stat_labels = {}
+        self.cb_worker = None
+        self._perm_vars = {}
+
+        self._build()
+
+    # ── Permission helpers ──
+    def _check_perm(self, perm_key):
+        if not self.current_user:
+            return False
+        if self.current_user.get('role') == 'admin':
+            return True
+        return bool(self.user_perms.get(perm_key, 0))
+
+    def _apply_permissions(self):
+        for widget_name, perm_key in self._perm_widgets:
+            self._apply_to_child(self.root, widget_name, perm_key)
+
+    def _apply_to_child(self, parent, widget_name, perm_key):
+        if hasattr(parent, '_perm_name') and parent._perm_name == widget_name:
+            try:
+                parent.config(state='normal' if self._check_perm(perm_key) else 'disabled')
+            except:
+                pass
+        for child in parent.winfo_children():
+            self._apply_to_child(child, widget_name, perm_key)
+
+    def _make_btn(self, tb, text, cmd, perm, bg_color):
+        btn = Button(tb, text=text, command=cmd, bg=bg_color, fg='white',
+                     font=('Microsoft YaHei', 9, 'bold'), relief='flat',
+                     padx=10, pady=3, cursor='hand2')
+        btn.pack(side=LEFT, padx=(0, 6))
+        btn._perm_name = text
+        self._perm_widgets.append((text, perm))
+        return btn
+
+    def _ph(self, entry, text):
+        entry._ph_text = text
+        entry.insert(0, text)
+        entry.config(fg='#999999')
+        def _in(e):
+            if entry.get() == entry._ph_text:
+                entry.delete(0, END)
+                entry.config(fg='#333333')
+        def _out(e):
+            if not entry.get().strip():
+                entry.insert(0, entry._ph_text)
+                entry.config(fg='#999999')
+        entry.bind('<FocusIn>', _in, '+')
+        entry.bind('<FocusOut>', _out, '+')
+
+    # ── Build main UI ──
+    def _build(self):
+        # Header
+        hdr = Frame(self.root, bg=PRIMARY, height=64)
+        hdr.pack(fill=X)
+        hdr.pack_propagate(False)
+        Label(hdr, text='生产记录管理系统', fg='white', bg=PRIMARY,
+              font=('Microsoft YaHei', 16, 'bold')).pack(padx=24, pady=(10, 0), anchor=W)
+        Label(hdr, text='工人 · 工序 · 产量 · 工资 · 动态图表', fg='#b0c4de',
+              bg=PRIMARY, font=('Microsoft YaHei', 9)).pack(padx=24, pady=(0, 8), anchor=W)
+
+        main = Frame(self.root, bg=BG)
+        main.pack(fill=BOTH, expand=True, padx=12, pady=(10, 8))
+
+        # ── Toolbar ──
+        tb = Frame(main, bg=CARD)
+        tb.pack(fill=X, pady=(0, 8))
+
+        self._make_btn(tb, '管理物料', self._manage_materials, 'material_manage', PRIMARY)
+        self._make_btn(tb, '管理工人', self._manage_workers, 'worker_manage', PRIMARY)
+        self._make_btn(tb, '管理工序', self._manage_processes, 'process_manage', PRIMARY)
+        self._make_btn(tb, '汇总查询', self._summary_page, 'summary_view', GREEN)
+        if self.current_user and self.current_user.get('role') == 'admin':
+            self._make_btn(tb, '用户管理', self._manage_users, 'user_manage', RED)
+            self._make_btn(tb, '权限管理', self._manage_permissions, 'user_manage', GREEN)
+
+        # ── Record entry form ──
+        fm = Frame(main, bg=CARD, highlightbackground='#ddd',
+                   highlightthickness=1, padx=14, pady=10)
+        fm.pack(fill=X, pady=(0, 10))
+        Label(fm, text='添加记录', font=('Microsoft YaHei', 11, 'bold'),
+              bg=CARD, fg=DARK).pack(anchor=W)
+        row = Frame(fm, bg=CARD)
+        row.pack(fill=X, pady=(6, 0))
+
+        fi = Frame(row, bg=CARD)
+        fi.pack(side=LEFT, padx=(0, 8))
+        Label(fi, text='ID', bg=CARD, fg='#666',
+              font=('Microsoft YaHei', 9)).pack(anchor=W, padx=(2, 0))
+        self.e_id = Entry(fi, width=6, font=('Microsoft YaHei', 11),
+                          relief='solid', bd=1, justify=CENTER)
+        self.e_id.pack()
+        self._ph(self.e_id, '留空自动')
+
+        fw = Frame(row, bg=CARD)
+        fw.pack(side=LEFT, padx=(0, 8))
+        Label(fw, text='选择工人', bg=CARD, fg='#666',
+              font=('Microsoft YaHei', 9)).pack(anchor=W, padx=(2, 0))
+        self.cb_worker = ttk.Combobox(fw, width=12, font=('Microsoft YaHei', 10),
+                                      state='readonly')
+        self.cb_worker.pack()
+
+        fp = Frame(row, bg=CARD)
+        fp.pack(side=LEFT, padx=(0, 8))
+        Label(fp, text='选择工序', bg=CARD, fg='#666',
+              font=('Microsoft YaHei', 9)).pack(anchor=W, padx=(2, 0))
+        self.cb_process = ttk.Combobox(fp, width=18, font=('Microsoft YaHei', 10),
+                                       state='readonly')
+        self.cb_process.pack()
+
+        fq = Frame(row, bg=CARD)
+        fq.pack(side=LEFT, padx=(0, 8))
+        Label(fq, text='件数', bg=CARD, fg='#666',
+              font=('Microsoft YaHei', 9)).pack(anchor=W, padx=(2, 0))
+        self.e_qty = Entry(fq, width=8, font=('Microsoft YaHei', 11),
+                           relief='solid', bd=1, justify=CENTER)
+        self.e_qty.pack()
+
+        fd = Frame(row, bg=CARD)
+        fd.pack(side=LEFT, padx=(0, 8))
+        Label(fd, text='日期', bg=CARD, fg='#666',
+              font=('Microsoft YaHei', 9)).pack(anchor=W, padx=(2, 0))
+        self.e_date = Entry(fd, width=12, font=('Microsoft YaHei', 11),
+                            relief='solid', bd=1, justify=CENTER)
+        self.e_date.pack()
+        self.e_date.insert(0, date.today().isoformat())
+        self.e_date.bind('<Button-1>', lambda e: self._show_calendar(self.e_date))
+
+        self.price_label = Label(row, text='', bg=CARD, fg=ACCENT,
+                                 font=('Microsoft YaHei', 10, 'bold'))
+        self.price_label.pack(side=LEFT, padx=(4, 8))
+
+        # Bind worker selection
+        self.cb_worker.bind('<<ComboboxSelected>>', self._on_worker_sel)
+        self.cb_process.bind('<<ComboboxSelected>>', self._on_process_sel)
+
+        btn_frame = Frame(row, bg=CARD)
+        btn_frame.pack(side=LEFT)
+        Button(btn_frame, text='添加', bg=ACCENT, fg='white',
+               font=('Microsoft YaHei', 9, 'bold'), relief='flat',
+               padx=10, pady=2, cursor='hand2',
+               command=self._do_add).pack()
+
+        del_frame = Frame(row, bg=CARD)
+        del_frame.pack(side=LEFT, padx=(4, 0))
+        btn_del = Button(del_frame, text='删除选中', bg=RED, fg='white',
+                         font=('Microsoft YaHei', 9, 'bold'), relief='flat',
+                         padx=10, pady=2, cursor='hand2',
+                         command=self._delete_selected)
+        btn_del.pack()
+        btn_del._perm_name = '删除记录'
+        self._perm_widgets.append(('删除记录', 'record_delete'))
+
+        # ── Stats bar ──
+        stats_bar = Frame(main, bg='white', relief='solid', bd=1)
+        stats_bar.pack(fill=X, pady=(0, 6))
+        for key, label in [('w', '工人数'), ('q', '总产量'), ('e', '总工价'), ('r', '记录数')]:
+            cell = Frame(stats_bar, bg='white')
+            cell.pack(side=LEFT, expand=True, padx=8, pady=6)
+            Label(cell, text=label, bg='white', fg='#888',
+                  font=('Microsoft YaHei', 8)).pack()
+            self._stat_labels[key] = Label(cell, text='0', bg='white', fg=DARK,
+                                           font=('Microsoft YaHei', 14, 'bold'))
+            self._stat_labels[key].pack()
+
+        # ── Records table ──
+        tree_frame = Frame(main)
+        tree_frame.pack(fill=BOTH, expand=True)
+        self._tree = ttk.Treeview(tree_frame,
+                                   columns=('id', 'material', 'process', 'worker',
+                                            'group', 'qty', 'price', 'wage', 'date'),
+                                   show='headings', height=12)
+        col_defs = [('id', 'ID', 40), ('material', '物料', 80), ('process', '工序', 100),
+                    ('worker', '姓名', 70), ('group', '组别', 70), ('qty', '件数', 60),
+                    ('price', '单价', 60), ('wage', '工资', 70), ('date', '日期', 100)]
+        for col, text, w in col_defs:
+            self._tree.heading(col, text=text)
+            self._tree.column(col, width=w, anchor=CENTER if col in ('id', 'qty', 'price', 'wage') else W)
+        self._tree.pack(side=LEFT, fill=BOTH, expand=True)
+        vsb = Scrollbar(tree_frame, orient=VERTICAL, command=self._tree.yview)
+        self._tree.configure(yscrollcommand=vsb.set)
+        vsb.pack(side=RIGHT, fill=Y)
+
+        # ── Bottom buttons ──
+        bottom = Frame(main, bg=BG)
+        bottom.pack(fill=X, pady=(4, 0))
+        Button(bottom, text='📊 生成图表报告', command=self._open_chart,
+               bg=PRIMARY, fg='white', font=('Microsoft YaHei', 9, 'bold'),
+               relief='flat', padx=10, cursor='hand2').pack(side=LEFT, padx=(0, 6))
+        Button(bottom, text='📅 月度汇总', command=self._monthly_summary,
+               bg=GREEN, fg='white', font=('Microsoft YaHei', 9, 'bold'),
+               relief='flat', padx=10, cursor='hand2').pack(side=LEFT)
+
+        # ── Status bar ──
+        bt = Frame(self.root, bg='white', highlightbackground='#ddd',
+                   highlightthickness=1)
+        bt.pack(fill=X)
+        if self.current_user:
+            un = self.current_user.get('username', '')
+            dn = self.current_user.get('display_name', '')
+            Label(bt, text=f'当前用户: {dn} ({un})', bg='white', fg='#888',
+                  font=('Microsoft YaHei', 8)).pack(side=LEFT, padx=12)
+        Button(bt, text='修改密码', bg='#2980b9', fg='white',
+               font=('Microsoft YaHei', 9, 'bold'), relief='flat',
+               padx=10, pady=2, cursor='hand2',
+               command=self._change_pw).pack(side=RIGHT, padx=(4, 4))
+        Button(bt, text='退出登录', bg=DARK, fg='white',
+               font=('Microsoft YaHei', 9, 'bold'), relief='flat',
+               padx=10, pady=2, cursor='hand2',
+               command=self._logout).pack(side=RIGHT, padx=(4, 4))
+
+        # Initial data load
+        self.refresh()
+        self._apply_permissions()
+
+    # ── Worker/Process selection linkage ──
+    def _on_worker_sel(self, ev):
+        sel = self.cb_worker.current()
+        if sel < 0:
+            return
+        wid = self._worker_ids[sel] if sel < len(self._worker_ids) else 0
+        if wid in self._worker_procs:
+            procs = self._worker_procs[wid]
+            self.cb_process['values'] = [f"{p['material']} - {p['process_name']}" for p in procs]
+        else:
+            self.cb_process['values'] = []
+        self.cb_process.set('')
+
+    def _on_process_sel(self, ev):
+        sel = self.cb_process.current()
+        if sel < 0:
+            return
+        wid = self.cb_worker.current()
+        if wid >= 0 and wid < len(self._worker_ids):
+            widsel = self._worker_ids[wid]
+            procs = self._worker_procs.get(widsel, [])
+            if sel < len(procs):
+                self.price_label.config(text=f"单价: {YEN}{procs[sel]['unit_price']}")
+
+    # ── CRUD operations ──
+    def _do_add(self):
+        wid = self.cb_worker.current()
+        pid = self.cb_process.current()
+        qty_s = self.e_qty.get().strip()
+        d = self.e_date.get().strip()
+        if wid < 0 or pid < 0 or not qty_s:
+            messagebox.showinfo('提示', '请选择工人、工序并填写件数')
+            return
+        try:
+            qty = float(qty_s)
+        except ValueError:
+            messagebox.showinfo('提示', '件数必须为数字')
+            return
+        widsel = self._worker_ids[wid]
+        proc_id = 0
+        price = 0
+        if widsel in self._worker_procs and pid < len(self._worker_procs[widsel]):
+            proc = self._worker_procs[widsel][pid]
+            proc_id = proc['id']
+            price = proc['unit_price']
+        if RecordRepository.add(widsel, proc_id, qty, price, d):
+            self.e_qty.delete(0, END)
+            self.refresh()
+            messagebox.showinfo('成功', '记录已添加')
+        else:
+            messagebox.showerror('错误', '添加失败')
+
+    def _delete_selected(self):
+        sel = self._tree.selection()
+        if not sel:
+            return
+        if not messagebox.askyesno('确认', '确定删除选中的记录？'):
+            return
+        for item in sel:
+            vals = self._tree.item(item, 'values')
+            if vals:
+                RecordRepository.delete(int(vals[0]))
+        self.refresh()
+
+    # ── Refresh ──
+    def refresh(self):
+        # Load workers and processes
+        self._worker_ids = []
+        self._worker_procs = {}
+        for w in WorkerRepository.get_all():
+            self._worker_ids.append(w['id'])
+            procs = []
+            for p in ProcessRepository.get_all():
+                procs.append(p)
+            self._worker_procs[w['id']] = procs
+
+        if hasattr(self, 'cb_worker') and self.cb_worker:
+            self.cb_worker['values'] = [w['name'] for w in WorkerRepository.get_all()]
+
+        # Refresh table
+        self._refresh_table()
+
+    def _refresh_table(self):
+        if not self._tree:
+            return
+        self._tree.delete(*self._tree.get_children())
+        records = RecordRepository.get_all(self.current_user)
+        for r in records[:200]:
+            wage = r['quantity'] * r['unit_price']
+            self._tree.insert('', END, values=(
+                r['id'], r['material'], r['process_name'], r['worker_name'],
+                r['group_name'], r['quantity'], f'{YEN}{r["unit_price"]}',
+                f'{YEN}{round(wage, 2)}', r['record_date']
+            ))
+
+        # Update stats
+        from models.record import RecordRepository as RR
+        stats = RR.get_stats()
+        t = stats.get('totals', {})
+        if self._stat_labels:
+            self._stat_labels['w'].config(text=t.get('w', 0))
+            self._stat_labels['q'].config(text=t.get('q', 0))
+            self._stat_labels['e'].config(text=f'{YEN}{round(t.get("e", 0), 2)}')
+            self._stat_labels['r'].config(text=t.get('r', 0))
+
+    # ── Charts ──
+    def _open_chart(self):
+        stats = RecordRepository.get_stats()
+        gen_report(stats, '生产记录统计')
+
+    def _monthly_summary(self):
+        from datetime import date as dt_date
+        import calendar as cal_mod
+        from tkinter import Toplevel, ttk
+        top = Toplevel(self.root)
+        top.title('月度汇总')
+        top.geometry('700x500')
+        top.configure(bg=CARD)
+        top.grab_set()
+        Label(top, text='选择月份', font=('Microsoft YaHei', 12, 'bold'),
+              bg=CARD, fg=DARK).pack(pady=(10, 4))
+        months = RecordRepository.list_months()
+        if not months:
+            Label(top, text='暂无数据', bg=CARD, fg='#888').pack()
+            return
+        cb = ttk.Combobox(top, values=months, state='readonly', width=12,
+                          font=('Microsoft YaHei', 11))
+        cb.pack(pady=4)
+        cb.set(months[0] if months else '')
+
+        def do_report():
+            m = cb.get()
+            if not m:
+                return
+            y, mo = int(m.split('-')[0]), int(m.split('-')[1])
+            _, ld = cal_mod.monthrange(y, mo)
+            stats = RecordRepository.get_stats(start_date=f'{m}-01', end_date=f'{y}-{mo:02d}-{ld:02d}')
+            gen_report(stats, f'{m} 月度汇总')
+
+        Button(top, text='生成报告', command=do_report, bg=PRIMARY, fg='white',
+               font=('Microsoft YaHei', 10, 'bold'), relief='flat',
+               padx=14, pady=4, cursor='hand2').pack(pady=6)
+
+        tr = ttk.Treeview(top, columns=('name', 'group', 'qty', 'wage'),
+                          show='headings', height=10)
+        for col, text, w in [('name', '工人', 100), ('group', '组别', 100),
+                              ('qty', '件数', 80), ('wage', '工资', 100)]:
+            tr.heading(col, text=text)
+            tr.column(col, width=w)
+        tr.pack(fill=BOTH, expand=True, padx=10, pady=10)
+
+        def refresh_m():
+            tr.delete(*tr.get_children())
+            m = cb.get()
+            if not m:
+                return
+            y, mo = int(m.split('-')[0]), int(m.split('-')[1])
+            _, ld = cal_mod.monthrange(y, mo)
+            stats = RecordRepository.get_stats(start_date=f'{m}-01', end_date=f'{y}-{mo:02d}-{ld:02d}')
+            for r in stats.get('by_worker', []):
+                tr.insert('', END, values=(r['worker'], r['group_name'], r['q'], round(r['e'], 2)))
+
+        cb.bind('<<ComboboxSelected>>', lambda e: refresh_m())
+        if months:
+            refresh_m()
+
+        def do_export():
+            m = cb.get()
+            if not m:
+                return
+            y, mo = int(m.split('-')[0]), int(m.split('-')[1])
+            _, ld = cal_mod.monthrange(y, mo)
+            stats = RecordRepository.get_stats(start_date=f'{m}-01', end_date=f'{y}-{mo:02d}-{ld:02d}')
+            path = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', f'月度汇总_{m}.xlsx')
+            if export_excel(stats, path, f'{m} 月度汇总'):
+                messagebox.showinfo('成功', f'已导出: {path}')
+
+        Button(top, text='导出 Excel', command=do_export, bg=GREEN, fg='white',
+               font=('Microsoft YaHei', 9, 'bold'), relief='flat',
+               padx=10, cursor='hand2').pack(pady=(0, 8))
+
+    # ── Dialogs ──
+    def _manage_materials(self):
+        MaterialDialog(self.root)
+
+    def _manage_workers(self):
+        WorkerDialog(self.root)
+
+    def _manage_processes(self):
+        ProcessDialog(self.root)
+
+    def _manage_users(self):
+        from ui.dialogs.user_dialog import UserDialog
+        UserDialog(self.root)
+
+    def _manage_permissions(self):
+        self._show_permission_dialog()
+
+    def _show_permission_dialog(self):
+        from tkinter import Toplevel, Label, Frame, Canvas, Scrollbar, Checkbutton, IntVar, VERTICAL, HORIZONTAL
+        top = Toplevel(self.root)
+        top.title('权限管理')
+        top.geometry('1000x500')
+        top.configure(bg=CARD)
+        top.grab_set()
+        Label(top, text='权限管理', font=('Microsoft YaHei', 12, 'bold'),
+              bg=CARD, fg=DARK).pack(anchor=W, padx=16, pady=(10, 4))
+        Label(top, text='点击复选框切换权限', font=('Microsoft YaHei', 9),
+              bg=CARD, fg='#888').pack(anchor=W, padx=16)
+
+        canvas = Canvas(top, bg=CARD, highlightthickness=0)
+        vsb = Scrollbar(top, orient=VERTICAL, command=canvas.yview)
+        hsb = Scrollbar(top, orient=HORIZONTAL, command=canvas.xview)
+        canvas.configure(yscrollcommand=vsb.set, xscrollcommand=hsb.set)
+        vsb.pack(side=RIGHT, fill=Y)
+        hsb.pack(side=BOTTOM, fill=X)
+        canvas.pack(side=LEFT, fill=BOTH, expand=True)
+
+        frame = Frame(canvas, bg=CARD)
+        canvas.create_window((0, 0), window=frame, anchor='nw')
+        frame.bind('<Configure>', lambda e: canvas.configure(scrollregion=canvas.bbox('all')))
+
+        users = UserRepository.get_all()
+        perm_labels = [
+            ('record_add', '添加记录'), ('record_delete', '删除记录'),
+            ('record_edit', '编辑记录'), ('material_manage', '管理物料'),
+            ('worker_manage', '管理工人'), ('process_manage', '管理工序'),
+            ('assignment_manage', '工序分配'), ('chart_view', '查看图表'),
+            ('summary_view', '查看汇总'), ('export_excel', '导出Excel'),
+            ('user_manage', '用户管理'),
+        ]
+        perms = [p[0] for p in perm_labels]
+
+        Label(frame, text='用户', bg=CARD, fg=DARK, font=('Microsoft YaHei', 9, 'bold'),
+              width=10, anchor='w').grid(row=0, column=0, padx=4, pady=2, sticky='w')
+        for ci, (pk, pl) in enumerate(perm_labels, 1):
+            Label(frame, text=pl, bg=CARD, fg='#555', font=('Microsoft YaHei', 8),
+                  width=7, anchor='w').grid(row=0, column=ci, padx=2, pady=2)
+
+        self._perm_vars = {}
+        for ri, u in enumerate(users, 1):
+            un = u['username']
+            Label(frame, text=un, bg=CARD, fg=DARK, font=('Microsoft YaHei', 9),
+                  width=10, anchor='w').grid(row=ri, column=0, padx=4, pady=1, sticky='w')
+            perms_dict = UserRepository.get_permissions(un)
+            for ci, pk in enumerate(perms, 1):
+                var = IntVar(value=perms_dict.get(pk, 0))
+                self._perm_vars[(un, pk)] = var
+                def make_cmd(u_name, p_key):
+                    return lambda: UserRepository.set_permission(
+                        u_name, p_key, self._perm_vars[(u_name, p_key)].get())
+                cb = Checkbutton(frame, variable=var, bg=CARD, command=make_cmd(un, pk))
+                cb.grid(row=ri, column=ci)
+
+    # ── Calendar ──
+    def _show_calendar(self, entry):
+        import calendar as cal_mod
+        from tkinter import Toplevel, Button
+        top = Toplevel(self.root)
+        top.title('选择日期')
+        top.geometry('300x260')
+        top.resizable(False, False)
+        top.configure(bg=CARD)
+        top.grab_set()
+        top.transient(self.root)
+        xp = self.root.winfo_x() + self.root.winfo_width() // 2 - 150
+        yp = self.root.winfo_y() + self.root.winfo_height() // 2 - 130
+        top.geometry(f'+{xp}+{yp}')
+
+        now = date.today()
+        state = {'y': now.year, 'm': now.month}
+
+        head = Frame(top, bg=CARD)
+        head.pack(fill=X, padx=8, pady=(8, 4))
+        btn_prev = Button(head, text='‹', bg='#eee', relief='flat',
+                          padx=4, cursor='hand2', font=('Microsoft YaHei', 10, 'bold'))
+        btn_prev.pack(side=LEFT)
+        title_lbl = Label(head, bg=CARD, fg=DARK, font=('Microsoft YaHei', 11, 'bold'))
+        title_lbl.pack(side=LEFT, expand=True)
+        btn_next = Button(head, text='›', bg='#eee', relief='flat',
+                          padx=4, cursor='hand2', font=('Microsoft YaHei', 10, 'bold'))
+        btn_next.pack(side=RIGHT)
+
+        grid = Frame(top, bg=CARD)
+        grid.pack(padx=8, fill=BOTH, expand=True)
+        for ci, d in enumerate(['一', '二', '三', '四', '五', '六', '日']):
+            Label(grid, text=d, bg=CARD, fg='#888', font=('Microsoft YaHei', 8),
+                  width=4).grid(row=0, column=ci, padx=1, pady=1)
+
+        def rebuild():
+            for w in grid.winfo_children():
+                if int(w.grid_info()['row']) > 0:
+                    w.destroy()
+            title_lbl.config(text=f'{state["y"]}年{state["m"]}月')
+            cal = cal_mod.monthcalendar(state['y'], state['m'])
+            today = date.today()
+            for ri, week in enumerate(cal, 1):
+                for ci, d in enumerate(week):
+                    if d == 0:
+                        continue
+                    is_today = (state['y'] == today.year and
+                                state['m'] == today.month and d == today.day)
+                    bg = '#1a73e8' if is_today else 'white'
+                    fg = 'white' if is_today else DARK
+                    btn = Button(grid, text=str(d), bg=bg, fg=fg,
+                                 font=('Microsoft YaHei', 9), relief='flat',
+                                 width=4, cursor='hand2',
+                                 command=lambda dd=d: [
+                                     entry.delete(0, END),
+                                     entry.insert(0, f'{state["y"]}-{state["m"]:02d}-{dd:02d}'),
+                                     top.destroy()])
+                    btn.grid(row=ri, column=ci, padx=1, pady=1)
+
+        def prev():
+            if state['m'] == 1:
+                state['y'] -= 1
+                state['m'] = 12
+            else:
+                state['m'] -= 1
+            rebuild()
+
+        def next_m():
+            if state['m'] == 12:
+                state['y'] += 1
+                state['m'] = 1
+            else:
+                state['m'] += 1
+            rebuild()
+
+        btn_prev.config(command=prev)
+        btn_next.config(command=next_m)
+        rebuild()
+
+    # ── Logout / Change password ──
+    def _logout(self):
+        if messagebox.askyesno('确认', '确定退出登录？'):
+            for w in self.root.winfo_children():
+                w.destroy()
+            return True  # Signal to main.py to show login again
+
+    def _change_pw(self):
+        un = self.current_user['username'] if self.current_user else ''
+        if not un:
+            return
+        from tkinter import Toplevel
+        cp = Toplevel(self.root)
+        cp.title('修改密码')
+        cp.geometry('320x230')
+        cp.configure(bg=CARD)
+        cp.resizable(False, False)
+        cp.grab_set()
+        cp.transient(self.root)
+        xp = self.root.winfo_x() + self.root.winfo_width() // 2 - 160
+        yp = self.root.winfo_y() + self.root.winfo_height() // 2 - 115
+        cp.geometry(f'+{xp}+{yp}')
+
+        Label(cp, text='修改密码', font=('Microsoft YaHei', 12, 'bold'),
+              bg=CARD, fg=DARK).pack(pady=(12, 10))
+        ff = Frame(cp, bg=CARD)
+        ff.pack(padx=24)
+        Label(ff, text='用户名：', bg=CARD, font=('Microsoft YaHei', 10)).grid(
+            row=0, column=0, sticky=W, pady=3)
+        eu = Entry(ff, width=20, font=('Microsoft YaHei', 10), relief='solid', bd=1)
+        eu.insert(0, un)
+        eu.config(state='readonly')
+        eu.grid(row=0, column=1, pady=3)
+        Label(ff, text='旧密码：', bg=CARD, font=('Microsoft YaHei', 10)).grid(
+            row=1, column=0, sticky=W, pady=3)
+        eo = Entry(ff, width=20, font=('Microsoft YaHei', 10), relief='solid', bd=1, show='*')
+        eo.grid(row=1, column=1, pady=3)
+        Label(ff, text='新密码：', bg=CARD, font=('Microsoft YaHei', 10)).grid(
+            row=2, column=0, sticky=W, pady=3)
+        en = Entry(ff, width=20, font=('Microsoft YaHei', 10), relief='solid', bd=1, show='*')
+        en.grid(row=2, column=1, pady=3)
+        Label(ff, text='确认密码：', bg=CARD, font=('Microsoft YaHei', 10)).grid(
+            row=3, column=0, sticky=W, pady=3)
+        ec = Entry(ff, width=20, font=('Microsoft YaHei', 10), relief='solid', bd=1, show='*')
+        ec.grid(row=3, column=1, pady=3)
+        err2 = Label(cp, text='', bg=CARD, fg=RED, font=('Microsoft YaHei', 9))
+        err2.pack(pady=(4, 0))
+
+        def do_change():
+            opw = eo.get().strip()
+            npw = en.get().strip()
+            cpw = ec.get().strip()
+            if not opw or not npw:
+                err2.config(text='请填写完整')
+                return
+            if npw != cpw:
+                err2.config(text='两次新密码不一致')
+                return
+            if len(npw) < 4:
+                err2.config(text='新密码至少4位')
+                return
+            user = UserRepository.get_by_username(un)
+            if not user:
+                err2.config(text='用户不存在')
+                return
+            if not _verify_pw(opw, user['password_hash']):
+                err2.config(text='旧密码错误')
+                return
+            UserRepository.update_password(un, npw)
+            messagebox.showinfo('成功', '密码修改成功')
+            cp.destroy()
+
+        Button(cp, text='确认修改', bg=ACCENT, fg='white',
+               font=('Microsoft YaHei', 10, 'bold'), relief='flat',
+               padx=20, pady=2, cursor='hand2',
+               command=do_change).pack(pady=(6, 0))
+        eo.focus()
+
+    # ── Summary page ──
+    def _summary_page(self):
+        from tkinter import Toplevel, ttk
+        from models.record import RecordRepository as RR
+        top = Toplevel(self.root)
+        top.title('汇总查询')
+        top.geometry('800x550')
+        top.configure(bg=CARD)
+        top.grab_set()
+        Label(top, text='汇总查询', font=('Microsoft YaHei', 12, 'bold'),
+              bg=CARD, fg=DARK).pack(anchor=W, padx=16, pady=(10, 4))
+
+        ff = Frame(top, bg=CARD)
+        ff.pack(fill=X, padx=16)
+        Label(ff, text='起始日期:', bg=CARD, fg='#555',
+              font=('Microsoft YaHei', 9)).pack(side=LEFT)
+        e_start = Entry(ff, width=12, font=('Microsoft YaHei', 10),
+                        relief='solid', bd=1)
+        e_start.bind('<Button-1>', lambda e: self._show_calendar(e_start))
+        e_start.pack(side=LEFT, padx=(2, 8))
+        Label(ff, text='结束日期:', bg=CARD, fg='#555',
+              font=('Microsoft YaHei', 9)).pack(side=LEFT)
+        e_end = Entry(ff, width=12, font=('Microsoft YaHei', 10),
+                      relief='solid', bd=1)
+        e_end.bind('<Button-1>', lambda e: self._show_calendar(e_end))
+        e_end.pack(side=LEFT, padx=(2, 8))
+
+        workers = WorkerRepository.get_all()
+        cb_worker = ttk.Combobox(ff, values=['全部'] + [w['name'] for w in workers],
+                                 state='readonly', width=10)
+        cb_worker.pack(side=LEFT, padx=(4, 4))
+        cb_worker.set('全部')
+
+        def do_query():
+            sd = e_start.get().strip() or None
+            ed = e_end.get().strip() or None
+            wf = None
+            sel = cb_worker.current()
+            if sel > 0 and sel <= len(workers):
+                wf = workers[sel - 1]['id']
+            stats = RR.get_stats(start_date=sd, end_date=ed, worker_filter=wf)
+            gen_report(stats, '汇总查询结果')
+
+        Button(ff, text='查询', command=do_query, bg=PRIMARY, fg='white',
+               font=('Microsoft YaHei', 9, 'bold'), relief='flat',
+               padx=10, cursor='hand2').pack(side=LEFT, padx=(8, 0))
+
+        tr = ttk.Treeview(top, columns=('worker', 'group', 'qty', 'wage'),
+                          show='headings', height=12)
+        for col, text, w in [('worker', '工人', 120), ('group', '组别', 120),
+                              ('qty', '件数', 100), ('wage', '工资', 120)]:
+            tr.heading(col, text=text)
+            tr.column(col, width=w)
+        tr.pack(fill=BOTH, expand=True, padx=16, pady=(8, 4))
+
+        def do_query_table():
+            sd = e_start.get().strip() or None
+            ed = e_end.get().strip() or None
+            wf = None
+            sel = cb_worker.current()
+            if sel > 0 and sel <= len(workers):
+                wf = workers[sel - 1]['id']
+            stats = RR.get_stats(start_date=sd, end_date=ed, worker_filter=wf)
+            tr.delete(*tr.get_children())
+            for r in stats.get('by_worker', []):
+                tr.insert('', END, values=(r['worker'], r['group_name'], r['q'], round(r['e'], 2)))
+
+        def do_export():
+            sd = e_start.get().strip() or None
+            ed = e_end.get().strip() or None
+            wf = None
+            sel = cb_worker.current()
+            if sel > 0 and sel <= len(workers):
+                wf = workers[sel - 1]['id']
+            stats = RR.get_stats(start_date=sd, end_date=ed, worker_filter=wf)
+            export_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '汇总查询.xlsx')
+            title = '汇总查询'
+            if sd or ed:
+                title += f' ({sd or ""}~{ed or ""})'
+            if export_excel(stats, export_path, title):
+                messagebox.showinfo('成功', f'已导出: {export_path}')
+
+        bf = Frame(top, bg=CARD)
+        bf.pack(fill=X, padx=16, pady=(0, 8))
+        Button(bf, text='查询表格', command=do_query_table, bg=PRIMARY, fg='white',
+               font=('Microsoft YaHei', 9, 'bold'), relief='flat',
+               padx=10, cursor='hand2').pack(side=LEFT, padx=(0, 6))
+        Button(bf, text='导出 Excel', command=do_export, bg=GREEN, fg='white',
+               font=('Microsoft YaHei', 9, 'bold'), relief='flat',
+               padx=10, cursor='hand2').pack(side=LEFT)
