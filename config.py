@@ -32,7 +32,17 @@ ALL_PERMS = ['record_add','record_delete','record_edit','material_manage',
 
 ROLE_ADMIN = 'admin'
 ROLE_LEADER = 'leader'
+ROLE_MANAGER = 'manager'
 ROLE_WORKER = 'worker'
+
+# 角色中文名称映射
+ROLE_NAMES = {
+    'admin': '管理员',
+    'manager': '生产部部长',
+    'leader': '组长',
+    'worker': '生产工人',
+}
+ROLE_NAMES_REV = {v: k for k, v in ROLE_NAMES.items()}
 
 # ── 货币符号 ──
 YEN = chr(0xa5)

@@ -674,3 +674,14 @@
 2026-07-22 14:50:24,410 [INFO] prod_sys:20: 数据库已连接: C:\Users\Administrator\Documents\Recording\data.db
 2026-07-22 14:50:24,410 [INFO] prod_sys:102: 数据库初始化完成
 2026-07-22 14:50:24,411 [INFO] prod_sys:28: 数据库已关闭
+2026-07-22 14:54:17,718 [INFO] prod_sys:20: 数据库已连接: C:\Users\Administrator\Documents\Recording\data.db
+2026-07-22 14:54:17,719 [INFO] prod_sys:102: 数据库初始化完成
+2026-07-22 14:54:57,498 [INFO] prod_sys:20: 数据库已连接: C:\Users\Administrator\Documents\Recording\data.db
+2026-07-22 14:54:57,499 [INFO] prod_sys:102: 数据库初始化完成
+2026-07-22 15:05:00,138 [INFO] prod_sys:20: 数据库已连接: C:\Users\Administrator\Documents\Recording\data.db
+2026-07-22 15:05:25,814 [INFO] prod_sys:20: 数据库已连接: C:\Users\Administrator\Documents\Recording\data.db
+2026-07-22 15:05:40,389 [INFO] prod_sys:20: 数据库已连接: C:\Users\Administrator\Documents\Recording\data.db
+2026-07-22 15:05:40,390 [INFO] prod_sys:102: 数据库初始化完成
+2026-07-22 15:09:27,287 [INFO] prod_sys:7: 测试日志写入
+2026-07-22 15:11:51,956 [INFO] prod_sys:20: 数据库已连接: C:\Users\Administrator\Documents\Recording\data.db
+2026-07-22 15:11:51,957 [INFO] prod_sys:102: 数据库初始化完成

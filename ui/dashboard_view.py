@@ -106,7 +106,7 @@ class DashboardView:
         self._make_btn(tb, '管理工人', self._manage_workers, 'worker_manage', PRIMARY)
         self._make_btn(tb, '管理工序', self._manage_processes, 'process_manage', PRIMARY)
         self._make_btn(tb, '汇总查询', self._summary_page, 'summary_view', GREEN)
-        if self.current_user and self.current_user.get('role') == 'admin':
+        if self._check_perm('user_manage'):
             self._make_btn(tb, '用户管理', self._manage_users, 'user_manage', RED)
             self._make_btn(tb, '权限管理', self._manage_permissions, 'user_manage', GREEN)
 
@@ -653,6 +653,7 @@ class DashboardView:
         ProcessDialog(self.root)
 
     def _manage_users(self):
+        logger.info('_manage_users 被调用')
         UserDialog(self.root)
 
     def _manage_permissions(self):

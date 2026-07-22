@@ -73,6 +73,7 @@ class Database:
             display_name TEXT NOT NULL DEFAULT '',
             role TEXT NOT NULL DEFAULT 'worker',
             worker_id INTEGER DEFAULT 0,
+            group_name TEXT NOT NULL DEFAULT '',
             created_at TEXT DEFAULT (datetime('now','localtime'))
         )""")
         c.execute("""CREATE TABLE IF NOT EXISTS user_permissions (
@@ -97,6 +98,12 @@ class Database:
         c.execute("SELECT COUNT(*) FROM users")
         if c.fetchone()[0] == 0:
             cls._seed_admin(c)
+
+        # 兼容旧数据库：添加 group_name 列
+        try:
+            c.execute("ALTER TABLE users ADD COLUMN group_name TEXT NOT NULL DEFAULT ''")
+        except Exception:
+            pass  # 列已存在，忽略
 
         conn.commit()
         logger.info('数据库初始化完成')

@@ -25,13 +25,13 @@ class UserRepository:
 
     @staticmethod
     def add(username: str, password: str, display_name: str = '',
-            role: str = 'worker', worker_id: int = 0) -> bool:
+            role: str = 'worker', worker_id: int = 0, group_name: str = '') -> bool:
         conn = Database.get_conn()
         try:
             h = hash_password(password)
             conn.execute("""INSERT INTO users
-                (username, password_hash, display_name, role, worker_id)
-                VALUES (?,?,?,?,?)""", (username, h, display_name, role, worker_id))
+                (username, password_hash, display_name, role, worker_id, group_name)
+                VALUES (?,?,?,?,?,?)""", (username, h, display_name, role, worker_id, group_name))
             for pk in ALL_PERMS:
                 conn.execute("INSERT OR IGNORE INTO user_permissions (username,perm_key,allowed) VALUES (?,?,0)",
                             (username, pk))
@@ -51,10 +51,10 @@ class UserRepository:
         logger.info(f'用户 {username} 密码已修改')
 
     @staticmethod
-    def update_profile(username: str, display_name: str, role: str, worker_id: int = 0):
+    def update_profile(username: str, display_name: str, role: str, worker_id: int = 0, group_name: str = ''):
         conn = Database.get_conn()
-        conn.execute("UPDATE users SET display_name=?,role=?,worker_id=? WHERE username=?",
-                    (display_name, role, worker_id, username))
+        conn.execute("UPDATE users SET display_name=?,role=?,worker_id=?,group_name=? WHERE username=?",
+                    (display_name, role, worker_id, group_name, username))
         conn.commit()
 
     @staticmethod

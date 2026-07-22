@@ -28,6 +28,7 @@ dist/
 .login_cred
 
 # Temp / output files
+*.log
 _hr_err.txt
 _hr_out.txt
 _correct_strings.txt
@@ -37,3 +38,4 @@ _extracted_strings.txt
 _html_strings.txt
 _test_*.txt
 _test_*.py
+test_*.py
