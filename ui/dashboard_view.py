@@ -9,6 +9,7 @@ import os
 from config import BG, CARD, PRIMARY, ACCENT, GREEN, RED, DARK, YEN, _BASE
 from services.chart_service import gen_report
 from services.export_service import export_excel
+from services.process_service import ProcessService
 from models.record import RecordRepository
 from models.worker import WorkerRepository
 from models.process import ProcessRepository
@@ -535,9 +536,8 @@ class DashboardView:
         self._worker_procs = {}
         for w in WorkerRepository.get_all():
             self._worker_ids.append(w['id'])
-            procs = []
-            for p in ProcessRepository.get_all():
-                procs.append(p)
+            assigned_ids = ProcessService.get_worker_processes(w['id'])
+            procs = [p for p in ProcessRepository.get_all() if p['id'] in assigned_ids]
             self._worker_procs[w['id']] = procs
 
         if hasattr(self, 'cb_worker') and self.cb_worker:
