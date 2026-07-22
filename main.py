@@ -115,7 +115,8 @@ class App:
 
     def _show_dashboard(self):
         from ui.dashboard_view import DashboardView
-        self.dashboard = DashboardView(self.root, self.current_user, self.user_perms)
+        self.dashboard = DashboardView(self.root, self.current_user, self.user_perms,
+                                       on_logout=self._logout)
 
     def _logout(self):
         if messagebox.askyesno('确认', '确定退出登录？'):

@@ -23,10 +23,11 @@ from utils.logger import logger
 
 
 class DashboardView:
-    def __init__(self, root, current_user, user_perms):
+    def __init__(self, root, current_user, user_perms, on_logout=None):
         self.root = root
         self.current_user = current_user
         self.user_perms = user_perms
+        self._on_logout = on_logout
         self._perm_widgets = []
         self._worker_ids = []
         self._worker_procs = {}
@@ -117,15 +118,6 @@ class DashboardView:
         row = Frame(fm, bg=CARD)
         row.pack(fill=X, pady=(6, 0))
 
-        fi = Frame(row, bg=CARD)
-        fi.pack(side=LEFT, padx=(0, 8))
-        Label(fi, text='ID', bg=CARD, fg='#666',
-              font=('Microsoft YaHei', 9)).pack(anchor=W, padx=(2, 0))
-        self.e_id = Entry(fi, width=6, font=('Microsoft YaHei', 11),
-                          relief='solid', bd=1, justify=CENTER)
-        self.e_id.pack()
-        self._ph(self.e_id, '留空自动')
-
         fw = Frame(row, bg=CARD)
         fw.pack(side=LEFT, padx=(0, 8))
         Label(fw, text='选择工人', bg=CARD, fg='#666',
@@ -211,7 +203,6 @@ class DashboardView:
             self._tree.heading(col, text=text)
             self._tree.column(col, width=w, anchor=CENTER if col in ('id', 'qty', 'price', 'wage') else W)
         self._tree.pack(side=LEFT, fill=BOTH, expand=True)
-        self._tree.bind('<Double-1>', self._edit_record)
         vsb = Scrollbar(tree_frame, orient=VERTICAL, command=self._tree.yview)
         self._tree.configure(yscrollcommand=vsb.set)
         vsb.pack(side=RIGHT, fill=Y)
@@ -640,7 +631,7 @@ class DashboardView:
             y, mo = int(m.split('-')[0]), int(m.split('-')[1])
             _, ld = cal_mod.monthrange(y, mo)
             stats = RecordRepository.get_stats(start_date=f'{m}-01', end_date=f'{y}-{mo:02d}-{ld:02d}')
-            path = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', f'月度汇总_{m}.xlsx')
+            path = os.path.join(_BASE, f'月度汇总_{m}.xlsx')
             if export_excel(stats, path, f'{m} 月度汇总'):
                 messagebox.showinfo('成功', f'已导出: {path}')
 
@@ -803,9 +794,8 @@ class DashboardView:
     # ── Logout / Change password ──
     def _logout(self):
         if messagebox.askyesno('确认', '确定退出登录？'):
-            for w in self.root.winfo_children():
-                w.destroy()
-            return True  # Signal to main.py to show login again
+            if self._on_logout:
+                self._on_logout()
 
     def _change_pw(self):
         un = self.current_user['username'] if self.current_user else ''
@@ -953,7 +943,7 @@ class DashboardView:
             if sel > 0 and sel <= len(workers):
                 wf = workers[sel - 1]['id']
             stats = RR.get_stats(start_date=sd, end_date=ed, worker_filter=wf)
-            export_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '汇总查询.xlsx')
+            export_path = os.path.join(_BASE, '汇总查询.xlsx')
             title = '汇总查询'
             if sd or ed:
                 title += f' ({sd or ""}~{ed or ""})'
