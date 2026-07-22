@@ -10,6 +10,7 @@ from config import BG, CARD, PRIMARY, ACCENT, GREEN, RED, DARK, YEN, _BASE
 from services.chart_service import gen_report
 from services.export_service import export_excel
 from services.process_service import ProcessService
+from ui.dialogs.user_dialog import UserDialog
 from models.record import RecordRepository
 from models.worker import WorkerRepository
 from models.process import ProcessRepository
@@ -206,6 +207,9 @@ class DashboardView:
         vsb = Scrollbar(tree_frame, orient=VERTICAL, command=self._tree.yview)
         self._tree.configure(yscrollcommand=vsb.set)
         vsb.pack(side=RIGHT, fill=Y)
+
+        # 绑定双击编辑事件（使用 tree 级别绑定，确保始终有效）
+        self._tree.bind('<Double-1>', self._edit_record)
 
         # ── Bottom buttons ──
         bottom = Frame(main, bg=BG)
@@ -551,7 +555,6 @@ class DashboardView:
             ))
             # 存储完整记录数据到 tags 中，供编辑时使用
             self._tree.item(item, tags=(str(r['id']),))
-            self._tree.tag_bind(item, '<Double-1>', self._edit_record)
 
         # Update stats
         from models.record import RecordRepository as RR
@@ -650,7 +653,6 @@ class DashboardView:
         ProcessDialog(self.root)
 
     def _manage_users(self):
-        from ui.dialogs.user_dialog import UserDialog
         UserDialog(self.root)
 
     def _manage_permissions(self):
@@ -680,7 +682,22 @@ class DashboardView:
         canvas.create_window((0, 0), window=frame, anchor='nw')
         frame.bind('<Configure>', lambda e: canvas.configure(scrollregion=canvas.bbox('all')))
 
-        users = UserRepository.get_all()
+        # 获取用户和权限数据
+        try:
+            users = UserRepository.get_all()
+            logger.info(f'权限管理: 加载了 {len(users)} 个用户')
+        except Exception as e:
+            logger.error(f'加载用户列表失败: {e}')
+            Label(top, text=f'加载数据失败: {e}', bg=CARD, fg='red',
+                  font=('Microsoft YaHei', 10)).pack(pady=20)
+            return
+
+        if not users:
+            logger.warning('权限管理: 没有用户可显示')
+            Label(top, text='暂无用户数据，请先添加用户', bg=CARD, fg='#888',
+                  font=('Microsoft YaHei', 10)).pack(pady=20)
+            return
+
         perm_labels = [
             ('record_add', '添加记录'), ('record_delete', '删除记录'),
             ('record_edit', '编辑记录'), ('material_manage', '管理物料'),
@@ -700,17 +717,20 @@ class DashboardView:
         self._perm_vars = {}
         for ri, u in enumerate(users, 1):
             un = u['username']
-            Label(frame, text=un, bg=CARD, fg=DARK, font=('Microsoft YaHei', 9),
-                  width=10, anchor='w').grid(row=ri, column=0, padx=4, pady=1, sticky='w')
-            perms_dict = UserRepository.get_permissions(un)
-            for ci, pk in enumerate(perms, 1):
-                var = IntVar(value=perms_dict.get(pk, 0))
-                self._perm_vars[(un, pk)] = var
-                def make_cmd(u_name, p_key):
-                    return lambda: UserRepository.set_permission(
-                        u_name, p_key, self._perm_vars[(u_name, p_key)].get())
-                cb = Checkbutton(frame, variable=var, bg=CARD, command=make_cmd(un, pk))
-                cb.grid(row=ri, column=ci)
+            try:
+                Label(frame, text=un, bg=CARD, fg=DARK, font=('Microsoft YaHei', 9),
+                      width=10, anchor='w').grid(row=ri, column=0, padx=4, pady=1, sticky='w')
+                perms_dict = UserRepository.get_permissions(un)
+                for ci, pk in enumerate(perms, 1):
+                    var = IntVar(value=perms_dict.get(pk, 0))
+                    self._perm_vars[(un, pk)] = var
+                    def make_cmd(u_name, p_key):
+                        return lambda: UserRepository.set_permission(
+                            u_name, p_key, self._perm_vars[(u_name, p_key)].get())
+                    cb = Checkbutton(frame, variable=var, bg=CARD, command=make_cmd(un, pk))
+                    cb.grid(row=ri, column=ci)
+            except Exception as e:
+                logger.error(f'加载用户 {un} 的权限失败: {e}')
 
     # ── Calendar ──
     def _show_calendar(self, entry):
