@@ -1,6 +1,5 @@
 """工序业务服务"""
 from models.process import ProcessRepository
-from models.record import RecordRepository
 from utils.logger import logger
 
 
@@ -31,14 +30,14 @@ class ProcessService:
 
     @staticmethod
     def get_worker_processes(worker_id: int) -> list[int]:
-        return RecordRepository.get_worker_processes(worker_id)
+        return ProcessRepository.get_worker_processes(worker_id)
 
     @staticmethod
     def assign_worker(worker_id: int, process_id: int):
-        RecordRepository.assign_worker_process(worker_id, process_id)
+        ProcessRepository.assign_worker_process(worker_id, process_id)
         logger.info(f'工人工序分配: worker={worker_id}, process={process_id}')
 
     @staticmethod
     def unassign_worker(worker_id: int, process_id: int):
-        RecordRepository.unassign_worker_process(worker_id, process_id)
+        ProcessRepository.unassign_worker_process(worker_id, process_id)
         logger.info(f'工人工序取消分配: worker={worker_id}, process={process_id}')

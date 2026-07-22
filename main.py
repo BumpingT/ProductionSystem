@@ -129,6 +129,8 @@ class App:
             self._show_login()
 
 if __name__ == '__main__':
+    from utils.error_handler import setup_global_handler
+    setup_global_handler()
     init_db()
     app = App()
     app.root.mainloop()

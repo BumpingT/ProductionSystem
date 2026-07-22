@@ -103,25 +103,3 @@ class RecordRepository:
         rows = conn.execute("SELECT DISTINCT substr(record_date,1,7) AS m FROM records ORDER BY m DESC").fetchall()
         return [r['m'] for r in rows]
 
-    @staticmethod
-    def get_worker_processes(worker_id: int) -> list[int]:
-        conn = Database.get_conn()
-        rows = conn.execute("SELECT process_id FROM worker_processes WHERE worker_id=?", (worker_id,)).fetchall()
-        return [r['process_id'] for r in rows]
-
-    @staticmethod
-    def assign_worker_process(worker_id: int, process_id: int):
-        conn = Database.get_conn()
-        try:
-            conn.execute("INSERT INTO worker_processes (worker_id,process_id) VALUES (?,?)",
-                        (worker_id, process_id))
-            conn.commit()
-        except Exception:
-            pass
-
-    @staticmethod
-    def unassign_worker_process(worker_id: int, process_id: int):
-        conn = Database.get_conn()
-        conn.execute("DELETE FROM worker_processes WHERE worker_id=? AND process_id=?",
-                    (worker_id, process_id))
-        conn.commit()

@@ -425,7 +425,7 @@ class DashboardView:
                 return
             wid = all_workers[w_idx]['id']
             # 获取该工人可用的工序
-            assigned_pids = set(RecordRepository.get_worker_processes(wid))
+            assigned_pids = set(ProcessService.get_worker_processes(wid))
             if assigned_pids:
                 filtered = [p for p in all_processes if p['id'] in assigned_pids]
             else:
@@ -452,7 +452,7 @@ class DashboardView:
                 wid_idx = cb_worker.current()
                 if wid_idx >= 0 and wid_idx < len(all_workers):
                     wid = all_workers[wid_idx]['id']
-                    assigned_pids = set(RecordRepository.get_worker_processes(wid))
+                    assigned_pids = set(ProcessService.get_worker_processes(wid))
                     if assigned_pids:
                         filtered = [p for p in all_processes if p['id'] in assigned_pids]
                     else:
@@ -496,7 +496,7 @@ class DashboardView:
 
             # 获取选中的工序ID和单价
             wid = all_workers[widx]['id']
-            assigned_pids2 = set(RecordRepository.get_worker_processes(wid))
+            assigned_pids2 = set(ProcessService.get_worker_processes(wid))
             if assigned_pids2:
                 filtered2 = [p for p in all_processes if p['id'] in assigned_pids2]
             else:
