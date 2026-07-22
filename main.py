@@ -484,69 +484,12 @@ class App:
         MaterialDialog(self.root)
     
     def manage_workers(self):
-        top = Toplevel(self.root); top.title('管理工人'); top.geometry('620x500')
-        top.configure(bg=CARD); top.grab_set()
-        Label(top, text='工人列表', font=('Microsoft YaHei',12,'bold'), bg=CARD, fg=DARK).pack(anchor=W, padx=16, pady=(10,4))
-        tr = ttk.Treeview(top, columns=('name','group'), show='headings', height=8)
-        tr.heading('name', text='姓名'); tr.heading('group', text='组别')
-        tr.column('name', width=180); tr.column('group', width=200)
-        def ref():
-            tr.delete(*tr.get_children())
-            for w in get_workers(): tr.insert('', END, values=(w['name'], w['group_name']))
-        ref(); tr.pack(padx=16, fill=BOTH, expand=True, pady=(4,4))
-        top._tr = tr
-        f = Frame(top, bg=CARD); f.pack(side=BOTTOM, fill=X, padx=16, pady=(0,6))
-        e_n = Entry(f, width=12, font=('Microsoft YaHei',11), relief='solid', bd=1); e_n.pack(side=LEFT, padx=(0,4))
-        _set_placeholder(e_n, '姓名')
-        e_g = Entry(f, width=12, font=('Microsoft YaHei',11), relief='solid', bd=1); e_g.pack(side=LEFT, padx=(0,4))
-        _set_placeholder(e_g, '组别')
-        def do_add():
-            n = e_n.get().strip(); g = e_g.get().strip()
-            if n == getattr(e_n,'_ph_text',None): n = ''
-            if not n: return
-            if add_worker(n, g): ref(); e_n.delete(0,END); e_g.delete(0,END)
-        Button(f, text='添加', bg=ACCENT, fg='white', font=('Microsoft YaHei',9,'bold'),
-               relief='flat', padx=8, cursor='hand2', command=do_add).pack(side=LEFT, padx=(4,0))
-        def do_del():
-            sel = tr.selection()
-            if sel:
-                v = tr.item(sel[0],'values')
-                if messagebox.askyesno('确认', f'删除工人 "{v[0]}"？'):
-                    delete_worker(int(tr.item(sel[0],'values')[0])); ref()
-        Button(f, text='删除', bg=RED, fg='white', relief='flat', padx=8, cursor='hand2', command=do_del).pack(side=LEFT, padx=(4,0))
+        from ui.dialogs.worker_dialog import WorkerDialog
+        WorkerDialog(self.root)
     
     def manage_processes(self):
-        top = Toplevel(self.root); top.title('管理工序'); top.geometry('600x450')
-        top.configure(bg=CARD); top.grab_set()
-        Label(top, text='工序列表', font=('Microsoft YaHei',12,'bold'), bg=CARD, fg=DARK).pack(anchor=W, padx=16, pady=(10,4))
-        tr = ttk.Treeview(top, columns=('material','process','price'), show='headings', height=10)
-        tr.heading('material', text='物料'); tr.heading('process', text='工序'); tr.heading('price', text='单价')
-        tr.column('material', width=130); tr.column('process', width=200); tr.column('price', width=80)
-        def ref():
-            tr.delete(*tr.get_children())
-            for p in get_processes(): tr.insert('', END, values=(p['material'], p['process_name'], p['unit_price']))
-        ref(); tr.pack(fill=BOTH, expand=True, padx=16)
-        f = Frame(top, bg=CARD); f.pack(fill=X, padx=16, pady=6)
-        e_m = Entry(f, width=10, font=('Microsoft YaHei',11), relief='solid', bd=1); e_m.pack(side=LEFT, padx=(0,4))
-        _set_placeholder(e_m, '物料'); e_pn = Entry(f, width=12, font=('Microsoft YaHei',11), relief='solid', bd=1)
-        e_pn.pack(side=LEFT, padx=(0,4)); _set_placeholder(e_pn, '工序')
-        e_pr = Entry(f, width=6, font=('Microsoft YaHei',11), relief='solid', bd=1); e_pr.pack(side=LEFT, padx=(0,4))
-        _set_placeholder(e_pr, '单价')
-        def do_add():
-            m = e_m.get().strip(); pn = e_pn.get().strip(); pr = e_pr.get().strip()
-            if m == getattr(e_m,'_ph_text',None): m = ''
-            if not m or not pn: return
-            try: price = float(pr) if pr else 0
-            except: price = 0
-            if add_process(m, pn, price): ref(); e_m.delete(0,END); e_pn.delete(0,END); e_pr.delete(0,END)
-        Button(f, text='添加', bg=ACCENT, fg='white', font=('Microsoft YaHei',9,'bold'),
-               relief='flat', padx=8, cursor='hand2', command=do_add).pack(side=LEFT)
-        def do_del():
-            sel = tr.selection()
-            if sel:
-                v = tr.item(sel[0],'values')
-                if messagebox.askyesno('确认', f'删除工序 "{v[1]}"？'): delete_process(int(tr.item(sel[0],'values')[0])); ref()
-        Button(f, text='删除', bg=RED, fg='white', relief='flat', padx=8, cursor='hand2', command=do_del).pack(side=LEFT, padx=(4,0))
+        from ui.dialogs.process_dialog import ProcessDialog
+        ProcessDialog(self.root)
     
     def manage_users(self):
         top = Toplevel(self.root); top.title('用户管理'); top.geometry('700x500')
