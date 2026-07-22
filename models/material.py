@@ -1,0 +1,35 @@
+"""物料数据访问"""
+from .database import Database
+from utils.logger import logger
+
+class MaterialRepository:
+    @staticmethod
+    def get_all() -> list[dict]:
+        conn = Database.get_conn()
+        rows = conn.execute("SELECT * FROM materials ORDER BY name").fetchall()
+        return [dict(r) for r in rows]
+
+    @staticmethod
+    def add(name: str, price: float = 0) -> bool:
+        conn = Database.get_conn()
+        try:
+            conn.execute("INSERT INTO materials (name,price) VALUES (?,?)", (name, price))
+            conn.commit()
+            logger.info(f'添加物料: {name}')
+            return True
+        except Exception as e:
+            logger.warning(f'添加物料失败 {name}: {e}')
+            return False
+
+    @staticmethod
+    def update(mid: int, name: str, price: float):
+        conn = Database.get_conn()
+        conn.execute("UPDATE materials SET name=?,price=? WHERE id=?", (name, price, mid))
+        conn.commit()
+
+    @staticmethod
+    def delete(mid: int):
+        conn = Database.get_conn()
+        conn.execute("DELETE FROM materials WHERE id=?", (mid,))
+        conn.commit()
+        logger.info(f'删除物料 ID={mid}')
