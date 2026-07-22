@@ -1,8 +1,6 @@
-"""
-工人管理对话框
-"""
+"""工人管理对话框"""
 from tkinter import messagebox
-from models.worker import WorkerRepository
+from services.worker_service import WorkerService
 from ui.widgets.crud_dialog_base import CrudDialogBase
 
 
@@ -18,7 +16,7 @@ class WorkerDialog(CrudDialogBase):
 
     def refresh(self):
         self.tree.delete(*self.tree.get_children())
-        for w in WorkerRepository.get_all():
+        for w in WorkerService.get_all():
             self.tree.insert('', 'end', iid=str(w['id']), values=(w['name'], w['group_name']))
 
     def on_add(self):
@@ -27,7 +25,7 @@ class WorkerDialog(CrudDialogBase):
         if not name:
             messagebox.showinfo('提示', '请输入工人姓名')
             return
-        if WorkerRepository.add(name, group):
+        if WorkerService.add(name, group):
             self.refresh()
             self.clear_entries()
         else:
@@ -36,5 +34,5 @@ class WorkerDialog(CrudDialogBase):
     def _on_delete_selected(self, item):
         vals = self.tree.item(item, 'values')
         if messagebox.askyesno('确认', f'删除工人 "{vals[0]}"？'):
-            WorkerRepository.delete(int(item))
+            WorkerService.delete(int(item))
             self.refresh()

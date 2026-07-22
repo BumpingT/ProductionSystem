@@ -4,9 +4,8 @@
 from tkinter import Toplevel, Label, Frame, Button, Entry, ttk, END, W, Checkbutton, IntVar
 from tkinter import messagebox
 from config import CARD, DARK, ACCENT, RED, GREEN, PRIMARY
-from models.process import ProcessRepository
 from models.worker import WorkerRepository
-from models.record import RecordRepository
+from services.process_service import ProcessService
 
 
 class ProcessDialog:
@@ -96,7 +95,7 @@ class ProcessDialog:
 
     def refresh(self):
         self.tree.delete(*self.tree.get_children())
-        for p in ProcessRepository.get_all():
+        for p in ProcessService.get_all():
             self.tree.insert('', 'end', iid=str(p['id']),
                            values=(p['material'], p['process_name'], p['unit_price']))
         self._refresh_workers()
@@ -111,7 +110,7 @@ class ProcessDialog:
             self.assign_info.config(text='请选中一个工序')
             return
 
-        assigned_ids = RecordRepository.get_worker_processes(self.selected_process_id)
+        assigned_ids = ProcessService.get_worker_processes(self.selected_process_id)
         self.assign_info.config(
             text=f'已分配 {len(assigned_ids)} 个工人，勾选/取消勾选以分配')
 
@@ -130,9 +129,9 @@ class ProcessDialog:
     def _toggle_worker(self, worker_id, process_id):
         """切换工人工序分配"""
         if self._worker_vars.get(worker_id, IntVar()).get():
-            RecordRepository.assign_worker_process(worker_id, process_id)
+            ProcessService.assign_worker(worker_id, process_id)
         else:
-            RecordRepository.unassign_worker_process(worker_id, process_id)
+            ProcessService.unassign_worker(worker_id, process_id)
 
     def _on_select(self, ev):
         sel = self.tree.selection()
@@ -156,7 +155,7 @@ class ProcessDialog:
         except ValueError:
             messagebox.showinfo('提示', '单价必须为数字')
             return
-        if ProcessRepository.add(material, process, price):
+        if ProcessService.add(material, process, price):
             self.e_material.delete(0, END)
             self.e_process.delete(0, END)
             self.e_price.delete(0, END)
@@ -170,6 +169,6 @@ class ProcessDialog:
             return
         vals = self.tree.item(sel[0], 'values')
         if messagebox.askyesno('确认', f'删除工序 "{vals[1]}"？'):
-            ProcessRepository.delete(int(sel[0]))
+            ProcessService.delete(int(sel[0]))
             self.selected_process_id = None
             self.refresh()

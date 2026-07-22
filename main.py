@@ -35,27 +35,29 @@ def _set_placeholder(entry, text):
 # ── Database ──
 
 from models.database import Database
-from models.material import MaterialRepository
-from models.worker import WorkerRepository
-from models.process import ProcessRepository
 from models.record import RecordRepository
 from models.user import UserRepository
+from services.material_service import MaterialService
+from services.worker_service import WorkerService
+from services.process_service import ProcessService
+from services.auth_service import AuthService
+from services.stats_service import StatsService
 
 init_db = Database.init_db
 get_conn = Database.get_conn
-get_materials = MaterialRepository.get_all
-add_material = MaterialRepository.add
-update_material = MaterialRepository.update
-delete_material = MaterialRepository.delete
-get_workers = WorkerRepository.get_all
-add_worker = WorkerRepository.add
-delete_worker = WorkerRepository.delete
-get_processes = ProcessRepository.get_all
-add_process = ProcessRepository.add
-delete_process = ProcessRepository.delete
-get_worker_processes = RecordRepository.get_worker_processes
-assign_worker_process = RecordRepository.assign_worker_process
-unassign_worker_process = RecordRepository.unassign_worker_process
+get_materials = MaterialService.get_all
+add_material = MaterialService.add
+update_material = MaterialService.update
+delete_material = MaterialService.delete
+get_workers = WorkerService.get_all
+add_worker = WorkerService.add
+delete_worker = WorkerService.delete
+get_processes = ProcessService.get_all
+add_process = ProcessService.add
+delete_process = ProcessService.delete
+get_worker_processes = ProcessService.get_worker_processes
+assign_worker_process = ProcessService.assign_worker
+unassign_worker_process = ProcessService.unassign_worker
 
 # ── 仍在 main.py 中使用的函数 ──
 get_users = UserRepository.get_all
@@ -66,14 +68,12 @@ update_user_display = UserRepository.update_profile
 delete_user = UserRepository.delete
 get_user_perms = UserRepository.get_permissions
 set_user_perm = UserRepository.set_permission
-update_worker = WorkerRepository.update
-update_material = MaterialRepository.update
-update_process = ProcessRepository.update
+update_worker = WorkerService.update
 add_record = RecordRepository.add
 update_record = RecordRepository.update
 delete_record = RecordRepository.delete
 get_all_records = RecordRepository.get_all
-get_stats = RecordRepository.get_stats
+get_stats = StatsService.get_summary
 list_months = RecordRepository.list_months
 
 # ── 服务层 ──
@@ -83,6 +83,12 @@ from services.export_service import export_excel
 # ── 基本路径 ──
 if getattr(sys, "frozen", False): _BASE = os.path.dirname(sys.executable)
 else: _BASE = os.path.dirname(os.path.abspath(__file__))
+
+# ── UI 模块（显式导入确保 PyInstaller 打包）──
+from ui.widgets.crud_dialog_base import CrudDialogBase
+from ui.dialogs.material_dialog import MaterialDialog
+from ui.dialogs.worker_dialog import WorkerDialog
+from ui.dialogs.process_dialog import ProcessDialog
 
 
 class App:
@@ -145,10 +151,10 @@ class App:
         def do_login():
             un = un_entry.get().strip(); pw = pw_entry.get()
             if not un or not pw: messagebox.showinfo('提示','请输入用户名和密码'); return
-            r = UserRepository.get_by_username(un)
-            if not r or not _verify_pw(pw, r['password_hash']):
+            user = AuthService.login(un, pw)
+            if not user:
                 messagebox.showerror('错误','用户名或密码错误'); return
-            self.current_user = dict(r)
+            self.current_user = user
             self.user_perms = get_user_perms(un)
             if cred_var.get(): _save_cred(un, pw)
             else: _clear_cred()
@@ -289,6 +295,14 @@ class App:
         btn_del.pack()
         btn_del._perm_name = '删除记录'
         self._perm_widgets.append(('删除记录', 'record_delete'))
+
+        # Edit button
+        edit_frame = Frame(row, bg=CARD); edit_frame.pack(side=LEFT, padx=(4,0))
+        btn_edit = Button(edit_frame, text='编辑选中', bg='#2980b9', fg='white', font=('Microsoft YaHei',9,'bold'),
+                         relief='flat', padx=10, pady=2, cursor='hand2', command=self._edit_selected)
+        btn_edit.pack()
+        btn_edit._perm_name = '编辑记录'
+        self._perm_widgets.append(('编辑记录', 'record_edit'))
         
         # Stats bar
         stats_bar = Frame(main, bg='white', relief='solid', bd=1); stats_bar.pack(fill=X, pady=(0,6))
@@ -309,6 +323,7 @@ class App:
         tr.pack(side=LEFT, fill=BOTH, expand=True)
         vsb = Scrollbar(tree_frame, orient=VERTICAL, command=tr.yview); tr.configure(yscrollcommand=vsb.set)
         vsb.pack(side=RIGHT, fill=Y)
+        tr.bind('<Double-1>', self._on_tree_double_click)
         self._tree = tr
         
         # Bottom buttons
@@ -317,6 +332,8 @@ class App:
                font=('Microsoft YaHei',9,'bold'), relief='flat', padx=10, cursor='hand2').pack(side=LEFT, padx=(0,6))
         Button(bottom, text='📅 月度汇总', command=self.monthly_summary, bg=GREEN, fg='white',
                font=('Microsoft YaHei',9,'bold'), relief='flat', padx=10, cursor='hand2').pack(side=LEFT)
+        Button(bottom, text='📎 导出表格', command=self._export_table, bg='#2980b9', fg='white',
+               font=('Microsoft YaHei',9,'bold'), relief='flat', padx=10, cursor='hand2').pack(side=LEFT, padx=(6,0))
         
         # Bottom status bar
         bt = Frame(self.root, bg='white', highlightbackground='#ddd', highlightthickness=1)
@@ -416,10 +433,164 @@ class App:
             vals = self._tree.item(item, 'values')
             if vals: delete_record(int(vals[0]))
         self.refresh()
+
+    def _on_tree_double_click(self, event):
+        """双击表格行触发编辑"""
+        self._edit_selected()
+
+    def _edit_selected(self):
+        """编辑选中的记录"""
+        sel = self._tree.selection()
+        if not sel:
+            messagebox.showinfo('提示', '请先选中一条记录')
+            return
+        if not self._check_perm('record_edit') and self.current_user.get('role') != 'admin':
+            messagebox.showinfo('提示', '没有编辑权限')
+            return
+        vals = self._tree.item(sel[0], 'values')
+        if not vals:
+            return
+        rid = int(vals[0])
+        # 获取当前选中记录信息
+        records = get_all_records(self.current_user)
+        record = None
+        for r in records:
+            if r['id'] == rid:
+                record = r
+                break
+        if not record:
+            return
+        self._show_edit_dialog(record)
+
+    def _show_edit_dialog(self, record):
+        """弹出编辑记录对话框"""
+        top = Toplevel(self.root)
+        top.title('编辑记录')
+        top.geometry('500x350')
+        top.configure(bg=CARD)
+        top.resizable(False, False)
+        top.grab_set()
+        top.transient(self.root)
+
+        Label(top, text='编辑生产记录', font=('Microsoft YaHei', 12, 'bold'),
+              bg=CARD, fg=DARK).pack(pady=(12, 8))
+
+        f = Frame(top, bg=CARD)
+        f.pack(padx=24, fill=X)
+
+        # 工人选择
+        workers = get_workers()
+        w_names = [w['name'] for w in workers]
+        default_w = record.get('worker_name', '')
+        w_idx = 0
+        for i, w in enumerate(workers):
+            if w['name'] == default_w:
+                w_idx = i
+                break
+
+        Label(f, text='工人：', bg=CARD, font=('Microsoft YaHei', 10)).grid(row=0, column=0, sticky=W, pady=4)
+        cb_w = ttk.Combobox(f, values=w_names, state='readonly', width=15, font=('Microsoft YaHei', 10))
+        cb_w.grid(row=0, column=1, pady=4, sticky=W)
+        if w_names:
+            cb_w.current(w_idx)
+
+        # 工序
+        processes = get_processes()
+        p_names = [f"{p['material']} - {p['process_name']}" for p in processes]
+        default_p = f"{record.get('material', '')} - {record.get('process_name', '')}"
+        p_idx = 0
+        for i, p in enumerate(p_names):
+            if p == default_p:
+                p_idx = i
+                break
+
+        Label(f, text='工序：', bg=CARD, font=('Microsoft YaHei', 10)).grid(row=1, column=0, sticky=W, pady=4)
+        cb_p = ttk.Combobox(f, values=p_names, state='readonly', width=25, font=('Microsoft YaHei', 10))
+        cb_p.grid(row=1, column=1, pady=4, sticky=W)
+        if p_names:
+            cb_p.current(p_idx)
+
+        # 件数
+        Label(f, text='件数：', bg=CARD, font=('Microsoft YaHei', 10)).grid(row=2, column=0, sticky=W, pady=4)
+        e_qty = Entry(f, width=10, font=('Microsoft YaHei', 11), relief='solid', bd=1, justify=CENTER)
+        e_qty.grid(row=2, column=1, pady=4, sticky=W)
+        e_qty.insert(0, str(int(record['quantity']) if record['quantity'] == int(record['quantity']) else record['quantity']))
+
+        # 日期
+        Label(f, text='日期：', bg=CARD, font=('Microsoft YaHei', 10)).grid(row=3, column=0, sticky=W, pady=4)
+        e_date = Entry(f, width=14, font=('Microsoft YaHei', 11), relief='solid', bd=1, justify=CENTER)
+        e_date.grid(row=3, column=1, pady=4, sticky=W)
+        e_date.insert(0, record.get('record_date', ''))
+        e_date.bind('<Button-1>', lambda e: self.show_calendar(e_date))
+
+        def do_save():
+            w_sel = cb_w.current()
+            p_sel = cb_p.current()
+            qty_s = e_qty.get().strip()
+            d = e_date.get().strip()
+            if w_sel < 0 or p_sel < 0:
+                messagebox.showinfo('提示', '请选择工人和工序')
+                return
+            try:
+                qty = float(qty_s)
+            except ValueError:
+                messagebox.showinfo('提示', '件数必须为数字')
+                return
+            wid = workers[w_sel]['id']
+            pid = processes[p_sel]['id']
+            price = processes[p_sel]['unit_price']
+            update_record(record['id'], wid, pid, qty, price, d)
+            messagebox.showinfo('成功', '记录已更新')
+            top.destroy()
+            self.refresh()
+
+        btn_f = Frame(top, bg=CARD)
+        btn_f.pack(pady=(12, 0))
+        Button(btn_f, text='保存修改', bg=ACCENT, fg='white', font=('Microsoft YaHei', 10, 'bold'),
+               relief='flat', padx=20, pady=3, cursor='hand2', command=do_save).pack(side=LEFT, padx=4)
+        Button(btn_f, text='取消', bg='#95a5a6', fg='white', font=('Microsoft YaHei', 10, 'bold'),
+               relief='flat', padx=20, pady=3, cursor='hand2', command=top.destroy).pack(side=LEFT, padx=4)
     
     def open_chart(self):
         stats = get_stats()
         gen_report(stats, '生产记录统计')
+
+    def _export_table(self):
+        """将当前表格数据导出到 Excel"""
+        try:
+            import openpyxl
+            from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
+        except ImportError:
+            messagebox.showinfo('提示', '请先安装 openpyxl:\npip install openpyxl')
+            return
+        records = get_all_records(self.current_user)
+        if not records:
+            messagebox.showinfo('提示', '没有可导出的数据')
+            return
+        from datetime import datetime
+        fname = f'生产记录_{datetime.now().strftime("%Y%m%d_%H%M%S")}.xlsx'
+        path = os.path.join(_BASE, fname)
+        wb = openpyxl.Workbook()
+        ws = wb.active
+        ws.title = '生产记录'
+        headers = ['ID', '物料', '工序', '工人', '组别', '件数', '单价', '工资', '日期']
+        for ci, h in enumerate(headers, 1):
+            cell = ws.cell(row=1, column=ci, value=h)
+            cell.font = Font(bold=True, color='00ffffff')
+            cell.fill = PatternFill('solid', fgColor='001a73e8')
+            cell.alignment = Alignment(horizontal='center')
+        for ri, r in enumerate(records, 2):
+            ws.cell(row=ri, column=1, value=r['id'])
+            ws.cell(row=ri, column=2, value=r.get('material', ''))
+            ws.cell(row=ri, column=3, value=r.get('process_name', ''))
+            ws.cell(row=ri, column=4, value=r.get('worker_name', ''))
+            ws.cell(row=ri, column=5, value=r.get('group_name', ''))
+            ws.cell(row=ri, column=6, value=r['quantity'])
+            ws.cell(row=ri, column=7, value=r['unit_price'])
+            ws.cell(row=ri, column=8, value=round(r['quantity'] * r['unit_price'], 2))
+            ws.cell(row=ri, column=9, value=r['record_date'])
+        wb.save(path)
+        messagebox.showinfo('成功', f'已导出: {fname}')
     
     def monthly_summary(self):
         top = Toplevel(self.root); top.title('月度汇总'); top.geometry('700x500')
@@ -475,15 +646,12 @@ class App:
     
     # ── Management dialogs ──
     def manage_materials(self):
-        from ui.dialogs.material_dialog import MaterialDialog
         MaterialDialog(self.root)
     
     def manage_workers(self):
-        from ui.dialogs.worker_dialog import WorkerDialog
         WorkerDialog(self.root)
     
     def manage_processes(self):
-        from ui.dialogs.process_dialog import ProcessDialog
         ProcessDialog(self.root)
     
     def manage_users(self):
