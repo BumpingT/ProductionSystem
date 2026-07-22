@@ -110,6 +110,41 @@ class DashboardView:
             self._make_btn(tb, '用户管理', self._manage_users, 'user_manage', RED)
             self._make_btn(tb, '权限管理', self._manage_permissions, 'user_manage', GREEN)
 
+        # ── 筛选栏 ──
+        filter_bar = Frame(main, bg=CARD, highlightbackground='#ddd',
+                           highlightthickness=1, padx=10, pady=4)
+        filter_bar.pack(fill=X, pady=(0, 6))
+        Label(filter_bar, text='筛选：', bg=CARD, fg=DARK,
+              font=('Microsoft YaHei', 9, 'bold')).pack(side=LEFT)
+        Label(filter_bar, text='日期从', bg=CARD, fg='#666',
+              font=('Microsoft YaHei', 9)).pack(side=LEFT, padx=(4, 0))
+        self._filter_date_from = Entry(filter_bar, width=10, font=('Microsoft YaHei', 9),
+                                        relief='solid', bd=1)
+        self._filter_date_from.pack(side=LEFT, padx=(2, 2))
+        self._filter_date_from.bind('<Button-1>', lambda e: self._show_calendar(self._filter_date_from))
+        Label(filter_bar, text='至', bg=CARD, fg='#666',
+              font=('Microsoft YaHei', 9)).pack(side=LEFT, padx=(2, 0))
+        self._filter_date_to = Entry(filter_bar, width=10, font=('Microsoft YaHei', 9),
+                                      relief='solid', bd=1)
+        self._filter_date_to.pack(side=LEFT, padx=(2, 4))
+        self._filter_date_to.bind('<Button-1>', lambda e: self._show_calendar(self._filter_date_to))
+        Label(filter_bar, text='工人', bg=CARD, fg='#666',
+              font=('Microsoft YaHei', 9)).pack(side=LEFT, padx=(4, 0))
+        self._filter_worker = ttk.Combobox(filter_bar, values=[], state='readonly', width=10)
+        self._filter_worker.pack(side=LEFT, padx=(2, 4))
+        Label(filter_bar, text='工序', bg=CARD, fg='#666',
+              font=('Microsoft YaHei', 9)).pack(side=LEFT, padx=(4, 0))
+        self._filter_process = ttk.Combobox(filter_bar, values=[], state='readonly', width=14)
+        self._filter_process.pack(side=LEFT, padx=(2, 4))
+        Button(filter_bar, text='查询', bg=PRIMARY, fg='white',
+               font=('Microsoft YaHei', 9, 'bold'), relief='flat',
+               padx=8, cursor='hand2',
+               command=self._apply_filter).pack(side=LEFT, padx=(4, 0))
+        Button(filter_bar, text='重置', bg='#999', fg='white',
+               font=('Microsoft YaHei', 9, 'bold'), relief='flat',
+               padx=8, cursor='hand2',
+               command=self._reset_filter).pack(side=LEFT, padx=(4, 0))
+
         # ── Record entry form ──
         fm = Frame(main, bg=CARD, highlightbackground='#ddd',
                    highlightthickness=1, padx=14, pady=10)
@@ -591,6 +626,18 @@ class DashboardView:
             else:
                 self.cb_worker.config(state='readonly')
 
+        # 填充筛选栏下拉框
+        if hasattr(self, '_filter_worker'):
+            self._filter_worker['values'] = ['(全部)'] + [w['name'] for w in all_workers]
+            if not self._filter_worker.get():
+                self._filter_worker.set('(全部)')
+        if hasattr(self, '_filter_process'):
+            all_procs = ProcessRepository.get_all()
+            proc_names = sorted(set(p['material'] + ' - ' + p['process_name'] for p in all_procs))
+            self._filter_process['values'] = ['(全部)'] + proc_names
+            if not self._filter_process.get():
+                self._filter_process.set('(全部)')
+
         # Refresh table
         self._refresh_table()
 
@@ -611,8 +658,82 @@ class DashboardView:
 
         # Update stats
         from models.record import RecordRepository as RR
-        stats = RR.get_stats()
+        stats = RR.get_stats(user=self.current_user)
         t = stats.get('totals', {})
+
+    def _apply_filter(self):
+        """应用筛选条件"""
+        sd = self._filter_date_from.get().strip()
+        ed = self._filter_date_to.get().strip()
+        wf = self._filter_worker.get() if hasattr(self, '_filter_worker') else '(全部)'
+        pf = self._filter_process.get() if hasattr(self, '_filter_process') else '(全部)'
+
+        # 查询记录
+        self._tree.delete(*self._tree.get_children())
+        conn = Database.get_conn()
+        wh = []
+        pa = []
+        # 用户权限过滤（组长按组，工人按自己）
+        if self.current_user:
+            if self.current_user.get('role') == 'worker' and self.current_user.get('worker_id'):
+                wh.append("r.worker_id=?")
+                pa.append(self.current_user['worker_id'])
+            elif self.current_user.get('role') == 'leader' and self.current_user.get('group_name'):
+                wh.append("r.worker_id IN (SELECT id FROM workers WHERE group_name=?)")
+                pa.append(self.current_user['group_name'])
+        # 筛选条件
+        if sd:
+            wh.append("r.record_date >= ?")
+            pa.append(sd)
+        if ed:
+            wh.append("r.record_date <= ?")
+            pa.append(ed)
+        if wf and wf != '(全部)':
+            wh.append("w.name=?")
+            pa.append(wf)
+        if pf and pf != '(全部)':
+            if ' - ' in pf:
+                mat, proc = pf.split(' - ', 1)
+                wh.append("p.material=? AND p.process_name=?")
+                pa.extend([mat, proc])
+        ws = " WHERE " + " AND ".join(wh) if wh else ""
+        rows = conn.execute(f"""SELECT r.*, w.name AS worker_name, w.group_name,
+                p.material, p.process_name
+                FROM records r
+                LEFT JOIN workers w ON r.worker_id = w.id
+                LEFT JOIN processes p ON r.process_id = p.id
+                {ws}
+                ORDER BY r.id DESC LIMIT 500""", pa).fetchall()
+        for r in rows:
+            wage = r['quantity'] * r['unit_price']
+            self._tree.insert('', END, values=(
+                r['id'], r['material'], r['process_name'], r['worker_name'],
+                r['group_name'], r['quantity'], f'{YEN}{r["unit_price"]}',
+                f'{YEN}{round(wage, 2)}', r['record_date']
+            ))
+            self._tree.item(self._tree.get_children()[-1], tags=(str(r['id']),))
+        # 更新统计
+        from models.record import RecordRepository as RR
+        stats = RR.get_stats(start_date=sd if sd else None, end_date=ed if ed else None,
+                            worker_filter=(next((w for w in WorkerRepository.get_all() if w['name'] == wf), None) or {}).get('id') if wf and wf != '(全部)' else None,
+                            user=self.current_user)
+        t = stats.get('totals', {})
+        self._stat_labels['w'].config(text=t.get('w', 0))
+        self._stat_labels['q'].config(text=str(t.get('q', 0)))
+        self._stat_labels['e'].config(text=f'{YEN}{round(t.get("e", 0), 2)}')
+        self._stat_labels['r'].config(text=t.get('r', 0))
+
+    def _reset_filter(self):
+        """重置筛选条件"""
+        if hasattr(self, '_filter_date_from'):
+            self._filter_date_from.delete(0, END)
+        if hasattr(self, '_filter_date_to'):
+            self._filter_date_to.delete(0, END)
+        if hasattr(self, '_filter_worker'):
+            self._filter_worker.set('(全部)')
+        if hasattr(self, '_filter_process'):
+            self._filter_process.set('(全部)')
+        self._refresh_table()
         if self._stat_labels:
             self._stat_labels['w'].config(text=t.get('w', 0))
             self._stat_labels['q'].config(text=t.get('q', 0))
