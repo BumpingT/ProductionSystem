@@ -19,6 +19,12 @@ class ProcessService:
         return result
 
     @staticmethod
+    def update(pid: int, material: str, process_name: str, unit_price: float):
+        """更新工序信息"""
+        ProcessRepository.update(pid, material, process_name, unit_price)
+        logger.info(f'工序更新: ID={pid}')
+
+    @staticmethod
     def delete(pid: int):
         ProcessRepository.delete(pid)
         logger.info(f'工序删除: ID={pid}')

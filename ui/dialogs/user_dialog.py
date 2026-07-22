@@ -27,9 +27,9 @@ class UserDialog:
               bg=CARD, fg='#888').pack(anchor=W, padx=16)
         
         # ── 用户列表 ──
-        self.tree = ttk.Treeview(self.top, columns=('username', 'display', 'role', 'group', 'worker'),
+        self.tree = ttk.Treeview(self.top, columns=('username', 'role', 'group', 'worker'),
                                   show='headings', height=10)
-        col_defs = [('username', '用户名', 120), ('display', '显示名', 120),
+        col_defs = [('username', '用户名', 120),
                     ('role', '角色', 80), ('group', '组别', 80), ('worker', '关联工人', 120)]
         for col, text, w in col_defs:
             self.tree.heading(col, text=text)
@@ -40,7 +40,7 @@ class UserDialog:
         f = Frame(self.top, bg=CARD)
         f.pack(fill='x', padx=16, pady=4)
         
-        # 第一行：用户名、密码、显示名
+        # 第一行：用户名、密码
         r1 = Frame(f, bg=CARD)
         r1.pack(fill='x', pady=(0, 4))
         Label(r1, text='用户名:', bg=CARD, font=('Microsoft YaHei', 9)).pack(side=LEFT)
@@ -50,10 +50,6 @@ class UserDialog:
         Label(r1, text='密码:', bg=CARD, font=('Microsoft YaHei', 9)).pack(side=LEFT)
         self.e_pw = Entry(r1, width=12, font=('Microsoft YaHei', 11), relief='solid', bd=1, show='*')
         self.e_pw.pack(side=LEFT, padx=(2, 8))
-        
-        Label(r1, text='显示名:', bg=CARD, font=('Microsoft YaHei', 9)).pack(side=LEFT)
-        self.e_dn = Entry(r1, width=10, font=('Microsoft YaHei', 11), relief='solid', bd=1)
-        self.e_dn.pack(side=LEFT, padx=(2, 8))
         
         # 第二行：角色、组别、关联工人
         r2 = Frame(f, bg=CARD)
@@ -132,6 +128,8 @@ class UserDialog:
 
     def _update_worker_list(self):
         """根据组别过滤关联工人列表"""
+        if not hasattr(self, 'cb_worker'):
+            return
         group_val = self.cb_group.get()
         is_leader = self.cb_role.get() == '组长'
         if is_leader and group_val and group_val != '(无)':
@@ -163,7 +161,7 @@ class UserDialog:
                             worker_name = w['name']
                             break
                 self.tree.insert('', 'end', iid=u['username'],
-                               values=(u['username'], u['display_name'],
+                               values=(u['username'],
                                        ROLE_NAMES.get(u['role'], u['role']),
                                        u.get('group_name', ''), worker_name))
         except Exception as e:
@@ -182,7 +180,7 @@ class UserDialog:
         """添加用户"""
         username = self.e_user.get().strip()
         password = self.e_pw.get()
-        display = self.e_dn.get().strip() or username
+        display = username  # 显示名不再单独设置
         role_cn = self.cb_role.get()
         # 中文角色名转英文存储
         role = ROLE_NAMES_REV.get(role_cn, 'worker')
@@ -206,7 +204,6 @@ class UserDialog:
             self.err_label.config(text='', fg=RED)
             self.e_user.delete(0, END)
             self.e_pw.delete(0, END)
-            self.e_dn.delete(0, END)
             self.cb_role.set('生产工人')
             self.cb_worker.set('(无)')
             self.cb_group.set('(无)')
@@ -233,7 +230,7 @@ class UserDialog:
         # 弹出编辑对话框
         top = Toplevel(self.top)
         top.title(f'编辑用户 - {un}')
-        top.geometry('360x320')
+        top.geometry('360x280')
         top.configure(bg=CARD)
         top.grab_set()
         top.transient(self.top)
@@ -244,9 +241,10 @@ class UserDialog:
         f = Frame(top, bg=CARD)
         f.pack(padx=20)
         
+        # 显示名
         Label(f, text='显示名:', bg=CARD, font=('Microsoft YaHei', 9)).grid(row=0, column=0, sticky=W, pady=3)
         e_dn = Entry(f, width=20, font=('Microsoft YaHei', 10), relief='solid', bd=1)
-        e_dn.insert(0, user.get('display_name', ''))
+        e_dn.insert(0, user.get('display_name', un))
         e_dn.grid(row=0, column=1, pady=3, padx=(4, 0))
         
         Label(f, text='角色:', bg=CARD, font=('Microsoft YaHei', 9)).grid(row=1, column=0, sticky=W, pady=3)
@@ -286,7 +284,7 @@ class UserDialog:
         
         Label(f, text='新密码(留空不改):', bg=CARD, font=('Microsoft YaHei', 9)).grid(row=3, column=0, sticky=W, pady=3)
         e_pw = Entry(f, width=20, font=('Microsoft YaHei', 10), relief='solid', bd=1, show='*')
-        e_pw.grid(row=2, column=1, pady=3, padx=(4, 0))
+        e_pw.grid(row=3, column=1, pady=3, padx=(4, 0))
         
         err = Label(top, text='', bg=CARD, fg=RED, font=('Microsoft YaHei', 9))
         err.pack(pady=(4, 0))

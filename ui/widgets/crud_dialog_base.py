@@ -54,9 +54,12 @@ class CrudDialogBase:
             self._entries[label] = e
             self._add_placeholder(e, label)
 
-        Button(f, text='添加', bg=ACCENT, fg='white', font=('Microsoft YaHei', 9, 'bold'),
+        # 将按钮放在一个子 Frame 中，方便子类添加额外按钮
+        btn_frame = Frame(f, bg=CARD)
+        btn_frame.pack(side='left')
+        Button(btn_frame, text='添加', bg=ACCENT, fg='white', font=('Microsoft YaHei', 9, 'bold'),
                relief='flat', padx=8, cursor='hand2', command=self.on_add).pack(side='left')
-        Button(f, text='删除', bg=RED, fg='white', font=('Microsoft YaHei', 9, 'bold'),
+        Button(btn_frame, text='删除', bg=RED, fg='white', font=('Microsoft YaHei', 9, 'bold'),
                relief='flat', padx=8, cursor='hand2', command=self.on_delete).pack(side='left', padx=(4, 0))
 
     def _add_placeholder(self, entry, text):

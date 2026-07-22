@@ -47,6 +47,8 @@ class ProcessDialog:
 
         Button(f, text='添加', bg=ACCENT, fg='white', font=('Microsoft YaHei', 9, 'bold'),
                relief='flat', padx=8, cursor='hand2', command=self._on_add).pack(side='left')
+        Button(f, text='编辑', bg=PRIMARY, fg='white', font=('Microsoft YaHei', 9, 'bold'),
+               relief='flat', padx=8, cursor='hand2', command=self._on_edit).pack(side='left', padx=(4, 0))
         Button(f, text='删除', bg=RED, fg='white', font=('Microsoft YaHei', 9, 'bold'),
                relief='flat', padx=8, cursor='hand2', command=self._on_delete).pack(side='left', padx=(4, 0))
 
@@ -162,6 +164,66 @@ class ProcessDialog:
             self.refresh()
         else:
             messagebox.showinfo('提示', '工序已存在')
+
+    def _on_edit(self):
+        """编辑选中的工序"""
+        sel = self.tree.selection()
+        if not sel:
+            messagebox.showinfo('提示', '请先选择一个工序')
+            return
+        item = sel[0]
+        vals = self.tree.item(item, 'values')
+        pid = int(item)
+
+        top = Toplevel(self.top)
+        top.title('编辑工序')
+        top.geometry('320x180')
+        top.configure(bg=CARD)
+        top.grab_set()
+        top.transient(self.top)
+
+        Label(top, text='修改工序信息', font=('Microsoft YaHei', 11, 'bold'),
+              bg=CARD, fg=DARK).pack(pady=(10, 6))
+
+        f = Frame(top, bg=CARD)
+        f.pack(padx=20)
+        Label(f, text='物料:', bg=CARD, font=('Microsoft YaHei', 9)).grid(row=0, column=0, sticky=W, pady=3)
+        e_mat = Entry(f, width=16, font=('Microsoft YaHei', 10), relief='solid', bd=1)
+        e_mat.insert(0, vals[0])
+        e_mat.grid(row=0, column=1, pady=3, padx=(4, 0))
+        Label(f, text='工序:', bg=CARD, font=('Microsoft YaHei', 9)).grid(row=1, column=0, sticky=W, pady=3)
+        e_proc = Entry(f, width=16, font=('Microsoft YaHei', 10), relief='solid', bd=1)
+        e_proc.insert(0, vals[1])
+        e_proc.grid(row=1, column=1, pady=3, padx=(4, 0))
+        Label(f, text='单价:', bg=CARD, font=('Microsoft YaHei', 9)).grid(row=2, column=0, sticky=W, pady=3)
+        e_price = Entry(f, width=16, font=('Microsoft YaHei', 10), relief='solid', bd=1)
+        e_price.insert(0, vals[2])
+        e_price.grid(row=2, column=1, pady=3, padx=(4, 0))
+
+        err = Label(top, text='', bg=CARD, fg=RED, font=('Microsoft YaHei', 9))
+        err.pack()
+
+        def do_save():
+            nm = e_mat.get().strip()
+            np_ = e_proc.get().strip()
+            ps = e_price.get().strip()
+            if not nm or not np_:
+                err.config(text='物料和工序不能为空')
+                return
+            try:
+                pr = float(ps) if ps else 0
+            except ValueError:
+                err.config(text='单价必须为数字')
+                return
+            ProcessService.update(pid, nm, np_, pr)
+            top.destroy()
+            self.refresh()
+            messagebox.showinfo('成功', '工序已更新')
+
+        Button(top, text='保存', bg=ACCENT, fg='white',
+               font=('Microsoft YaHei', 10, 'bold'), relief='flat',
+               padx=16, pady=2, cursor='hand2',
+               command=do_save).pack(pady=(8, 4))
 
     def _on_delete(self):
         sel = self.tree.selection()

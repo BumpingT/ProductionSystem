@@ -644,12 +644,21 @@ class DashboardView:
 
     # ── Dialogs ──
     def _manage_materials(self):
+        if not self._check_perm('material_manage'):
+            messagebox.showinfo('提示', '您没有管理物料的权限')
+            return
         MaterialDialog(self.root)
 
     def _manage_workers(self):
+        if not self._check_perm('worker_manage'):
+            messagebox.showinfo('提示', '您没有管理工人的权限')
+            return
         WorkerDialog(self.root)
 
     def _manage_processes(self):
+        if not self._check_perm('process_manage'):
+            messagebox.showinfo('提示', '您没有管理工序的权限')
+            return
         ProcessDialog(self.root)
 
     def _manage_users(self):
