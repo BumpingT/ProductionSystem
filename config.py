@@ -44,5 +44,19 @@ ROLE_NAMES = {
 }
 ROLE_NAMES_REV = {v: k for k, v in ROLE_NAMES.items()}
 
+# 角色默认权限（key为角色英文名，value为允许的权限键列表）
+ROLE_DEFAULT_PERMS = {
+    'worker': ['record_add'],
+    'leader': ['record_add', 'record_edit', 'record_delete',
+               'material_manage', 'worker_manage', 'process_manage',
+               'assignment_manage', 'chart_view', 'summary_view',
+               'monthly_view', 'export_excel'],
+    'manager': ['record_add', 'record_edit', 'record_delete',
+                'material_manage', 'worker_manage', 'process_manage',
+                'assignment_manage', 'chart_view', 'summary_view',
+                'monthly_view', 'export_excel', 'user_manage'],
+    'admin': ALL_PERMS,  # 管理员默认全部权限
+}
+
 # ── 货币符号 ──
 YEN = chr(0xa5)

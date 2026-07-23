@@ -81,7 +81,9 @@ class ChangePasswordDialog:
                 err2.config(text='新密码不能与旧密码相同')
                 return
             UserRepository.update_password(un, npw)
-            messagebox.showinfo('成功', '密码修改成功')
+            from utils.auth import clear_credential
+            clear_credential()
+            messagebox.showinfo('成功', '密码修改成功', parent=cp)
             cp.destroy()
 
         Button(cp, text='确认修改', bg=ACCENT, fg='white',

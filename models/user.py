@@ -33,8 +33,9 @@ class UserRepository:
                 (username, password_hash, display_name, role, worker_id, group_name)
                 VALUES (?,?,?,?,?,?)""", (username, h, display_name, role, worker_id, group_name))
             for pk in ALL_PERMS:
-                conn.execute("INSERT OR IGNORE INTO user_permissions (username,perm_key,allowed) VALUES (?,?,0)",
-                            (username, pk))
+                allowed = 1 if pk in ROLE_DEFAULT_PERMS.get(role, []) else 0
+                conn.execute("INSERT OR IGNORE INTO user_permissions (username,perm_key,allowed) VALUES (?,?,?)",
+                            (username, pk, allowed))
             conn.commit()
             logger.info(f'添加用户: {username}')
             return True

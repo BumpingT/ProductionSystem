@@ -89,6 +89,18 @@ class WorkerDialog:
         self.tree.delete(*self.tree.get_children())
         all_w = WorkerService.get_all()
 
+        # 组长：记录可管辖的worker_id列表
+        accessible_worker_ids = None
+        if self._user and self._user.get('role') == 'leader':
+            from models.user import UserRepository
+            lw_ids = UserRepository.get_leader_workers(self._user['username'])
+            if lw_ids:
+                accessible_worker_ids = set(lw_ids)
+            elif self._user.get('group_name'):
+                accessible_worker_ids = set(w['id'] for w in all_w if w.get('group_name') == self._user['group_name'])
+            else:
+                accessible_worker_ids = set()
+
         # 按班组分组
         groups = WorkerService.get_groups()
         group_workers = {g: [] for g in groups}
@@ -102,14 +114,35 @@ class WorkerDialog:
         for g in groups:
             gid = f'group_{g}'
             workers = group_workers.get(g, [])
-            count = len(workers)
+            if accessible_worker_ids is not None:
+                # 组长模式：只显示自己管辖的工人，其他班组灰色
+                visible_workers = [w for w in workers if w['id'] in accessible_worker_ids]
+                count = len(visible_workers)
+                has_access = count > 0
+            else:
+                visible_workers = workers
+                count = len(workers)
+                has_access = True
+
             self.tree.insert('', 'end', iid=gid, text=f'  📁 {g}  ({count}人)', open=True)
-            for w in workers:
+            if not has_access:
+                self.tree.tag_configure('disabled_group', foreground='#bbbbbb')
+                self.tree.item(gid, tags=('disabled_group',))
+            for w in visible_workers:
                 self.tree.insert(gid, 'end', iid=str(w['id']),
                                 text=f'    👤 {w["name"]}')
 
-        # 刷新班组下拉
-        self.cb_group['values'] = groups
+        # 刷新班组下拉（组长只显示自己管辖的班组）
+        if accessible_worker_ids is not None:
+            all_workers_in_db = WorkerService.get_all()
+            leader_groups = set()
+            for w in all_workers_in_db:
+                if w['id'] in accessible_worker_ids and w.get('group_name'):
+                    leader_groups.add(w['group_name'])
+            group_list = sorted(leader_groups) if leader_groups else groups
+        else:
+            group_list = groups
+        self.cb_group['values'] = group_list
         if groups:
             self.cb_group.set(groups[0])
 
@@ -252,6 +285,14 @@ class WorkerDialog:
             messagebox.showinfo('提示', '请选择班组节点（而非工人节点）', parent=self.top)
             return
         gname = item.replace('group_', '')
+        # 权限检查：组长只能删除自己管辖的班组
+        if self._user and self._user.get('role') == 'leader':
+            from models.user import UserRepository
+            lw_ids = UserRepository.get_leader_workers(self._user['username'])
+            group_worker_ids = set(w['id'] for w in WorkerService.get_all() if w.get('group_name') == gname)
+            if not group_worker_ids.intersection(lw_ids):
+                messagebox.showinfo('提示', '您只能删除自己管辖的班组', parent=self.top)
+                return
         # 获取组内工人数
         children = self.tree.get_children(item)
         count = len(children)

@@ -316,7 +316,7 @@ class UserDialog:
         cb_g.set(cur_group if cur_group else '(无)')
         cb_g.grid(row=2, column=1, pady=3, padx=(4, 0))
         
-        # 关联工人（仅生产工人显示）
+        # 关联工人
         worker_frame = Frame(f, bg=CARD)
         worker_frame.grid(row=3, column=0, columnspan=2, sticky=W, pady=1)
         Label(worker_frame, text='关联工人:', bg=CARD, font=('Microsoft YaHei', 9)).pack(side=LEFT)
@@ -332,13 +332,6 @@ class UserDialog:
         if not cur_wid or not cb_w.get():
             cb_w.set('(无)')
         cb_w.pack(side=LEFT, padx=(4, 0))
-        # 组长/部长/管理员隐藏，其他角色（含自定义）显示
-        def _toggle_worker_frame():
-            role = cb_r.get()
-            is_hidden = role in ('组长', '生产部部长', '管理员')
-            worker_frame.grid_remove() if is_hidden else worker_frame.grid()
-        _toggle_worker_frame()
-        cb_r.bind('<<ComboboxSelected>>', lambda e: _toggle_worker_frame())
         
         Label(f, text='新密码(留空不改):', bg=CARD, font=('Microsoft YaHei', 9)).grid(row=4, column=0, sticky=W, pady=3)
         e_pw = Entry(f, width=20, font=('Microsoft YaHei', 10), relief='solid', bd=1, show='*')

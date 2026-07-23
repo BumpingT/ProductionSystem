@@ -508,6 +508,20 @@ class DashboardView:
             matched = ['(全部)'] + [n for n in names if kw.lower() in n.lower()]
             self._filter_worker['values'] = matched
 
+    def _show_empty_hint(self, tree, text='暂无数据'):
+        """在 TreeView 中显示灰色空数据提示"""
+        tree.delete(*tree.get_children())
+        cols = tree.cget('columns')
+        if isinstance(cols, str):
+            cols = cols.split()
+        n_cols = len(cols) if cols else 1
+        # 第一条为0避免int()转换错误，其余为空字符串
+        tree.insert('', 'end', values=['0'] + [''] * (n_cols - 1),
+                    tags=('empty_hint',))
+        # 在第一个可见单元格显示提示文字（覆盖ID列后的第一列）
+        tree.tag_configure('empty_hint', foreground='#999999', font=('Microsoft YaHei', 9),
+                           anchor='center')
+
     def _get_order_sql(self, default_desc=True):
         """根据排序选择器返回 ORDER BY 子句"""
         sort = getattr(self, '_filter_sort', None)
@@ -538,6 +552,12 @@ class DashboardView:
             ))
             # 存储完整记录数据到 tags 中，供编辑时使用
             self._tree.item(item, tags=(str(r['id']),))
+
+        if not records:
+            self._tree.delete(*self._tree.get_children())
+            self._tree.insert('', END, values=(0, '暂无匹配的生产记录', '', '', '', '', '', '', ''))
+            self._tree.tag_configure('empty_hint', foreground='#999', font=('Microsoft YaHei', 9))
+            self._tree.item(self._tree.get_children()[0], tags=('empty_hint',))
 
         # Update stats
         from models.record import RecordRepository as RR
@@ -611,6 +631,11 @@ class DashboardView:
                     f'{YEN}{round(wage, 2)}', r['record_date']
                 ))
                 self._tree.item(self._tree.get_children()[-1], tags=(str(r['id']),))
+            if not rows:
+                self._tree.delete(*self._tree.get_children())
+                self._tree.insert('', END, values=(0, '筛选无匹配的记录', '', '', '', '', '', '', ''))
+                self._tree.tag_configure('empty_hint', foreground='#999', font=('Microsoft YaHei', 9))
+                self._tree.item(self._tree.get_children()[0], tags=('empty_hint',))
             # 更新统计
             from models.record import RecordRepository as RR
             from models.worker import WorkerRepository
@@ -714,6 +739,11 @@ class DashboardView:
             stats = RecordRepository.get_stats(start_date=f'{m}-01', end_date=f'{y}-{mo:02d}-{ld:02d}', user=self.current_user)
             for r in stats.get('by_worker', []):
                 tr.insert('', END, values=(r['worker'], r['group_name'], r['q'], round(r['e'], 2)))
+            if not stats.get('by_worker', []):
+                tr.delete(*tr.get_children())
+                tr.insert('', END, values=('该月暂无生产记录', '', '', ''))
+                tr.tag_configure('empty_hint', foreground='#999', font=('Microsoft YaHei', 9))
+                tr.item(tr.get_children()[0], tags=('empty_hint',))
 
         cb.bind('<<ComboboxSelected>>', lambda e: refresh_m())
         if months:
@@ -955,6 +985,11 @@ class DashboardView:
             tr.delete(*tr.get_children())
             for r in stats.get('by_worker', []):
                 tr.insert('', END, values=(r['worker'], r['group_name'], r['q'], round(r['e'], 2)))
+            if not stats.get('by_worker', []):
+                tr.delete(*tr.get_children())
+                tr.insert('', END, values=('该时间段无生产记录', '', '', ''))
+                tr.tag_configure('empty_hint', foreground='#999', font=('Microsoft YaHei', 9))
+                tr.item(tr.get_children()[0], tags=('empty_hint',))
 
         def do_export():
             sd = e_start.get().strip() or None
@@ -992,3 +1027,6 @@ class DashboardView:
         Button(bf, text='导出 Excel', command=do_export, bg=GREEN, fg='white',
                font=('Microsoft YaHei', 9, 'bold'), relief='flat',
                padx=10, cursor='hand2').pack(side=LEFT)
+        
+        # 打开时自动查询
+        top.after(100, do_query)
