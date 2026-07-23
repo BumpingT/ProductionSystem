@@ -93,6 +93,20 @@ class CrudDialogBase:
         """刷新列表，由子类覆盖"""
         pass
 
+    def _save_and_refresh(self):
+        """保存选中行后刷新，刷新后将选中行置顶"""
+        old = self.tree.selection()
+        old_iid = old[0] if old else None
+        self.refresh()
+        if old_iid and old_iid in self.tree.get_children():
+            children = self.tree.get_children()
+            idx = list(children).index(old_iid)
+            total = len(children)
+            if total > 0:
+                self.tree.yview_moveto(idx / total if idx / total < 0.9 else 0.9)
+            self.tree.selection_set(old_iid)
+            self.tree.focus(old_iid)
+
     def on_add(self):
         """添加按钮回调，由子类覆盖"""
         pass

@@ -95,6 +95,8 @@ class UserDialog:
         self.cb_worker.pack(side=LEFT, padx=(2, 4))
         self.cb_worker.set('(无)')
         self._worker_frame.pack(side=LEFT)
+        # 选择工人时自动填入组别
+        self.cb_worker.bind('<<ComboboxSelected>>', lambda e: self._on_worker_selected())
         
         # 保存完整工人列表
         self._all_workers = self._worker_list[:]
@@ -118,6 +120,29 @@ class UserDialog:
         self.err_label.pack()
         
         self.refresh()
+
+    def _save_and_refresh(self):
+        """刷新并保持选中行置顶"""
+        old = self.tree.selection()
+        old_iid = old[0] if old else None
+        self.refresh()
+        if old_iid and old_iid in self.tree.get_children():
+            children = self.tree.get_children()
+            idx = list(children).index(old_iid)
+            total = len(children)
+            if total > 0:
+                self.tree.yview_moveto(idx / total if idx / total < 0.9 else 0.9)
+            self.tree.selection_set(old_iid)
+            self.tree.focus(old_iid)
+
+    def _on_worker_selected(self):
+        """选择工人后自动填入组别"""
+        idx = self.cb_worker.current()
+        if idx > 0 and idx <= len(self._all_workers):
+            worker = self._all_workers[idx - 1]
+            g = worker.get('group_name', '')
+            if g:
+                self.cb_group.set(g)
 
     def _toggle_group(self):
         """组别下拉框始终可用"""
@@ -178,7 +203,7 @@ class UserDialog:
         """获取当前选中的用户名"""
         sel = self.tree.selection()
         if not sel:
-            messagebox.showinfo('提示', '请先选择一个用户')
+            messagebox.showinfo('提示', '请先选择一个用户', parent=self.top)
             return None
         return sel[0]
     
@@ -207,9 +232,14 @@ class UserDialog:
             return
         
         if UserRepository.add(username, password, display, role, worker_id, group_name):
+            # 如果有关联工人且选了组别，同步更新工人的组别
+            if worker_id and group_name:
+                for w in self._all_workers:
+                    if w['id'] == worker_id:
+                        WorkerRepository.update(worker_id, w['name'], group_name)
+                        break
             # 如果是组长，自动关联本组所有工人
             if role == 'leader' and group_name:
-                from models.worker import WorkerRepository
                 group_workers = [w for w in WorkerRepository.get_all() if w.get('group_name') == group_name]
                 UserRepository.set_leader_workers(username, [w['id'] for w in group_workers])
             self.err_label.config(text='', fg=RED)
@@ -220,7 +250,7 @@ class UserDialog:
             self.cb_group.set('(无)')
             self._toggle_group()
             self.refresh()
-            messagebox.showinfo('成功', f'用户 "{username}" 已添加')
+            messagebox.showinfo('成功', f'用户 "{username}" 已添加', parent=self.top)
         else:
             self.err_label.config(text='添加失败，用户名可能已存在')
     
@@ -235,7 +265,7 @@ class UserDialog:
         
         user = UserRepository.get_by_username(un)
         if not user:
-            messagebox.showerror('错误', '用户不存在')
+            messagebox.showerror('错误', '用户不存在', parent=self.top)
             return
         
         # 弹出编辑对话框
@@ -243,8 +273,10 @@ class UserDialog:
         top.title(f'编辑用户 - {un}')
         top.geometry('360x260')
         top.configure(bg=CARD)
-        top.grab_set()
         top.transient(self.top)
+        top.grab_set()
+        top.focus_force()
+        top.lift()
         
         Label(top, text=f'编辑用户: {un}', font=('Microsoft YaHei', 11, 'bold'),
               bg=CARD, fg=DARK).pack(pady=(10, 8))
@@ -292,9 +324,15 @@ class UserDialog:
             gv = cb_g.get()
             gp = gv if gv != '(无)' else ''
             UserRepository.update_profile(un, un, rl, user.get('worker_id', 0), gp)
+            # 如果有关联工人且改了组别，同步更新工人的组别
+            wid = user.get('worker_id', 0)
+            if wid and gp:
+                for w in WorkerRepository.get_all():
+                    if w['id'] == wid:
+                        WorkerRepository.update(wid, w['name'], gp)
+                        break
             # 如果是组长，更新管辖工人关联
             if rl == 'leader' and gp:
-                from models.worker import WorkerRepository
                 group_workers = [w for w in WorkerRepository.get_all() if w.get('group_name') == gp]
                 UserRepository.set_leader_workers(un, [w['id'] for w in group_workers])
             elif rl != 'leader':
@@ -305,8 +343,8 @@ class UserDialog:
                     return
                 UserRepository.update_password(un, npw)
             top.destroy()
-            self.refresh()
-            messagebox.showinfo('成功', '用户信息已更新')
+            self._save_and_refresh()
+            messagebox.showinfo('成功', '用户信息已更新', parent=self.top)
         
         Button(top, text='保存', bg=ACCENT, fg='white',
                font=('Microsoft YaHei', 10, 'bold'), relief='flat',
@@ -318,11 +356,11 @@ class UserDialog:
         if not un:
             return
         if un == 'admin':
-            messagebox.showinfo('提示', '不能删除管理员账号')
+            messagebox.showinfo('提示', '不能删除管理员账号', parent=self.top)
             return
-        if messagebox.askyesno('确认', f'确定删除用户 "{un}"？'):
+        if messagebox.askyesno('确认', f'确定删除用户 "{un}"？', parent=self.top):
             if UserRepository.delete(un):
-                self.refresh()
-                messagebox.showinfo('成功', f'用户 "{un}" 已删除')
+                self._save_and_refresh()
+                messagebox.showinfo('成功', f'用户 "{un}" 已删除', parent=self.top)
             else:
-                messagebox.showerror('错误', '删除失败')
+                messagebox.showerror('错误', '删除失败', parent=self.top)

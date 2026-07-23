@@ -102,6 +102,20 @@ class ProcessDialog:
                            values=(p['material'], p['process_name'], p['unit_price']))
         self._refresh_workers()
 
+    def _save_and_refresh(self):
+        """刷新并保持选中行置顶"""
+        old = self.tree.selection()
+        old_iid = old[0] if old else None
+        self.refresh()
+        if old_iid and old_iid in self.tree.get_children():
+            children = self.tree.get_children()
+            idx = list(children).index(old_iid)
+            total = len(children)
+            if total > 0:
+                self.tree.yview_moveto(idx / total if idx / total < 0.9 else 0.9)
+            self.tree.selection_set(old_iid)
+            self.tree.focus(old_iid)
+
     def _refresh_workers(self):
         """刷新工人分配列表"""
         for w in self.worker_frame.winfo_children():
@@ -150,12 +164,12 @@ class ProcessDialog:
         if material == getattr(self.e_material, '_ph_text', None): material = ''
         if process == getattr(self.e_process, '_ph_text', None): process = ''
         if not material or not process:
-            messagebox.showinfo('提示', '请输入物料和工序名称')
+            messagebox.showinfo('提示', '请输入物料和工序名称', parent=self.top)
             return
         try:
             price = float(price_str) if price_str else 0
         except ValueError:
-            messagebox.showinfo('提示', '单价必须为数字')
+            messagebox.showinfo('提示', '单价必须为数字', parent=self.top)
             return
         if ProcessService.add(material, process, price):
             self.e_material.delete(0, END)
@@ -163,13 +177,13 @@ class ProcessDialog:
             self.e_price.delete(0, END)
             self.refresh()
         else:
-            messagebox.showinfo('提示', '工序已存在')
+            messagebox.showinfo('提示', '工序已存在', parent=self.top)
 
     def _on_edit(self):
         """编辑选中的工序"""
         sel = self.tree.selection()
         if not sel:
-            messagebox.showinfo('提示', '请先选择一个工序')
+            messagebox.showinfo('提示', '请先选择一个工序', parent=self.top)
             return
         item = sel[0]
         vals = self.tree.item(item, 'values')
@@ -179,8 +193,10 @@ class ProcessDialog:
         top.title('编辑工序')
         top.geometry('320x180')
         top.configure(bg=CARD)
-        top.grab_set()
         top.transient(self.top)
+        top.grab_set()
+        top.focus_force()
+        top.lift()
 
         Label(top, text='修改工序信息', font=('Microsoft YaHei', 11, 'bold'),
               bg=CARD, fg=DARK).pack(pady=(10, 6))
@@ -217,8 +233,8 @@ class ProcessDialog:
                 return
             ProcessService.update(pid, nm, np_, pr)
             top.destroy()
-            self.refresh()
-            messagebox.showinfo('成功', '工序已更新')
+            self._save_and_refresh()
+            messagebox.showinfo('成功', '工序已更新', parent=self.top)
 
         Button(top, text='保存', bg=ACCENT, fg='white',
                font=('Microsoft YaHei', 10, 'bold'), relief='flat',
@@ -230,7 +246,7 @@ class ProcessDialog:
         if not sel:
             return
         vals = self.tree.item(sel[0], 'values')
-        if messagebox.askyesno('确认', f'删除工序 "{vals[1]}"？'):
+        if messagebox.askyesno('确认', f'删除工序 "{vals[1]}"？', parent=self.top):
             ProcessService.delete(int(sel[0]))
             self.selected_process_id = None
-            self.refresh()
+            self._save_and_refresh()

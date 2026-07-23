@@ -250,12 +250,8 @@ class DashboardView:
         # ── Bottom buttons ──
         bottom = Frame(main, bg=BG)
         bottom.pack(fill=X, pady=(4, 0))
-        Button(bottom, text='📊 生成图表报告', command=self._open_chart,
-               bg=PRIMARY, fg='white', font=('Microsoft YaHei', 9, 'bold'),
-               relief='flat', padx=10, cursor='hand2').pack(side=LEFT, padx=(0, 6))
-        Button(bottom, text='📅 月度汇总', command=self._monthly_summary,
-               bg=GREEN, fg='white', font=('Microsoft YaHei', 9, 'bold'),
-               relief='flat', padx=10, cursor='hand2').pack(side=LEFT)
+        self._make_btn(bottom, '📊 生成图表报告', self._open_chart, 'chart_view', PRIMARY)
+        self._make_btn(bottom, '📅 月度汇总', self._monthly_summary, 'monthly_view', GREEN)
 
         # ── Status bar ──
         bt = Frame(self.root, bg='white', highlightbackground='#ddd',
@@ -288,11 +284,11 @@ class DashboardView:
         if sel < 0:
             return
         wid = self._worker_ids[sel] if sel < len(self._worker_ids) else 0
-        if wid in self._worker_procs:
+        if wid in self._worker_procs and self._worker_procs[wid]:
             procs = self._worker_procs[wid]
             self.cb_process['values'] = [f"{p['material']} - {p['process_name']}" for p in procs]
         else:
-            self.cb_process['values'] = []
+            self.cb_process['values'] = ['(请联系管理员分配工序)']
         self.cb_process.set('')
 
     def _on_process_sel(self, ev):
@@ -623,7 +619,11 @@ class DashboardView:
         for w in all_workers:
             self._worker_ids.append(w['id'])
             assigned_ids = ProcessService.get_worker_processes(w['id'])
-            procs = [p for p in ProcessRepository.get_all() if p['id'] in assigned_ids]
+            all_procs = ProcessRepository.get_all()
+            if assigned_ids:
+                procs = [p for p in all_procs if p['id'] in assigned_ids]
+            else:
+                procs = []  # 未分配工序则不可选
             self._worker_procs[w['id']] = procs
 
         if hasattr(self, 'cb_worker') and self.cb_worker:
@@ -638,6 +638,7 @@ class DashboardView:
                 if worker_name:
                     self.cb_worker.set(worker_name)
                     self.cb_worker.config(state='disabled')
+                    self._on_worker_sel(None)  # 触发工序下拉框更新
                 else:
                     self.cb_worker.config(state='readonly')
             else:
@@ -784,10 +785,16 @@ class DashboardView:
 
     # ── Charts ──
     def _open_chart(self):
-        stats = RecordRepository.get_stats()
+        if not self._check_perm('chart_view'):
+            messagebox.showinfo('提示', '您没有查看图表的权限')
+            return
+        stats = RecordRepository.get_stats(user=self.current_user)
         gen_report(stats, '生产记录统计')
 
     def _monthly_summary(self):
+        if not self._check_perm('monthly_view'):
+            messagebox.showinfo('提示', '您没有查看月度汇总的权限')
+            return
         from datetime import date as dt_date
         import calendar as cal_mod
         from tkinter import Toplevel, ttk
@@ -943,8 +950,8 @@ class DashboardView:
             ('record_edit', '编辑记录'), ('material_manage', '管理物料'),
             ('worker_manage', '管理工人'), ('process_manage', '管理工序'),
             ('assignment_manage', '工序分配'), ('chart_view', '查看图表'),
-            ('summary_view', '查看汇总'), ('export_excel', '导出Excel'),
-            ('user_manage', '用户管理'),
+            ('summary_view', '查看汇总'), ('monthly_view', '月度汇总'),
+            ('export_excel', '导出Excel'), ('user_manage', '用户管理'),
         ]
         perms = [p[0] for p in perm_labels]
 

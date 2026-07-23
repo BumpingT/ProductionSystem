@@ -28,7 +28,7 @@ DARK = '#2c3e50'
 # ── 权限 ──
 ALL_PERMS = ['record_add','record_delete','record_edit','material_manage',
              'worker_manage','process_manage','assignment_manage','chart_view',
-             'summary_view','export_excel','user_manage']
+             'summary_view','monthly_view','export_excel','user_manage']
 
 ROLE_ADMIN = 'admin'
 ROLE_LEADER = 'leader'

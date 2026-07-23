@@ -1,7 +1,7 @@
 """
 物料管理对话框 — 管理物料名称，显示工序总价
 """
-from tkinter import Toplevel, Label, Frame, Button, Entry, ttk, END, W, messagebox, StringVar
+from tkinter import Toplevel, Label, Frame, Button, Entry, ttk, END, W, LEFT, messagebox, StringVar
 from config import CARD, DARK, ACCENT, RED, GREEN, PRIMARY
 from models.material import MaterialRepository
 from models.database import Database
@@ -53,19 +53,19 @@ class MaterialDialog(CrudDialogBase):
     def on_add(self):
         name = self.get_entry_value('名称')
         if not name:
-            messagebox.showinfo('提示', '请输入物料名称')
+            messagebox.showinfo('提示', '请输入物料名称', parent=self.top)
             return
         if MaterialRepository.add(name, 0):
             self.refresh()
             self.clear_entries()
         else:
-            messagebox.showinfo('提示', '物料已存在')
+            messagebox.showinfo('提示', '物料已存在', parent=self.top)
 
     def on_edit(self):
         """编辑选中的物料名称"""
         sel = self.tree.selection()
         if not sel:
-            messagebox.showinfo('提示', '请先选择一个物料')
+            messagebox.showinfo('提示', '请先选择一个物料', parent=self.top)
             return
         item = sel[0]
         mid = int(item)
@@ -74,7 +74,7 @@ class MaterialDialog(CrudDialogBase):
         conn = Database.get_conn()
         row = conn.execute("SELECT * FROM materials WHERE id=?", (mid,)).fetchone()
         if not row:
-            messagebox.showerror('错误', '无法获取物料信息')
+            messagebox.showerror('错误', '无法获取物料信息', parent=self.top)
             return
         old_name = row['name']
         old_price = row['price']
@@ -84,8 +84,10 @@ class MaterialDialog(CrudDialogBase):
         top.title('编辑物料')
         top.geometry('320x150')
         top.configure(bg=CARD)
-        top.grab_set()
         top.transient(self.top)
+        top.grab_set()
+        top.focus_force()
+        top.lift()
 
         Label(top, text='修改物料名称', font=('Microsoft YaHei', 11, 'bold'),
               bg=CARD, fg=DARK).pack(pady=(10, 6))
@@ -109,8 +111,8 @@ class MaterialDialog(CrudDialogBase):
                 return
             MaterialRepository.update(mid, new_name, old_price)
             top.destroy()
-            self.refresh()
-            messagebox.showinfo('成功', '物料已更新')
+            self._save_and_refresh()
+            messagebox.showinfo('成功', '物料已更新', parent=self.top)
 
         Button(top, text='保存', bg=ACCENT, fg='white',
                font=('Microsoft YaHei', 10, 'bold'), relief='flat',
@@ -119,6 +121,6 @@ class MaterialDialog(CrudDialogBase):
 
     def _on_delete_selected(self, item):
         vals = self.tree.item(item, 'values')
-        if messagebox.askyesno('确认', f'删除物料 "{vals[0]}"？'):
+        if messagebox.askyesno('确认', f'删除物料 "{vals[0]}"？', parent=self.top):
             MaterialRepository.delete(int(item))  # iid = material id
-            self.refresh()
+            self._save_and_refresh()

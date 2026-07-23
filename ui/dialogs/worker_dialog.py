@@ -53,18 +53,18 @@ class WorkerDialog(CrudDialogBase):
         name = self.get_entry_value('姓名')
         group = self.get_entry_value('组别')
         if not name:
-            messagebox.showinfo('提示', '请输入工人姓名')
+            messagebox.showinfo('提示', '请输入工人姓名', parent=self.top)
             return
         if WorkerService.add(name, group):
             self.refresh()
             self.clear_entries()
         else:
-            messagebox.showinfo('提示', '工人已存在')
+            messagebox.showinfo('提示', '工人已存在', parent=self.top)
 
     def on_edit(self):
         sel = self.tree.selection()
         if not sel:
-            messagebox.showinfo('提示', '请先选择一个工人')
+            messagebox.showinfo('提示', '请先选择一个工人', parent=self.top)
             return
         item = sel[0]
         vals = self.tree.item(item, 'values')
@@ -74,8 +74,10 @@ class WorkerDialog(CrudDialogBase):
         top.title('编辑工人')
         top.geometry('300x160')
         top.configure(bg=CARD)
-        top.grab_set()
         top.transient(self.top)
+        top.grab_set()
+        top.focus_force()
+        top.lift()
 
         Label(top, text='修改工人信息', font=('Microsoft YaHei', 11, 'bold'),
               bg=CARD, fg=DARK).pack(pady=(10, 6))
@@ -102,8 +104,8 @@ class WorkerDialog(CrudDialogBase):
                 return
             WorkerService.update(wid, nn, ng)
             top.destroy()
-            self.refresh()
-            messagebox.showinfo('成功', '工人信息已更新')
+            self._save_and_refresh()
+            messagebox.showinfo('成功', '工人信息已更新', parent=self.top)
 
         Button(top, text='保存', bg=ACCENT, fg='white',
                font=('Microsoft YaHei', 10, 'bold'), relief='flat',
@@ -112,15 +114,15 @@ class WorkerDialog(CrudDialogBase):
 
     def _on_delete_selected(self, item):
         vals = self.tree.item(item, 'values')
-        if messagebox.askyesno('确认', f'删除工人 "{vals[0]}"？'):
+        if messagebox.askyesno('确认', f'删除工人 "{vals[0]}"？', parent=self.top):
             WorkerService.delete(int(item))
-            self.refresh()
+            self._save_and_refresh()
 
     def _on_delete_with_account(self):
         """删除选中的工人及其关联的用户账号"""
         sel = self.tree.selection()
         if not sel:
-            messagebox.showinfo('提示', '请先选择一个工人')
+            messagebox.showinfo('提示', '请先选择一个工人', parent=self.top)
             return
         item = sel[0]
         vals = self.tree.item(item, 'values')
@@ -131,22 +133,22 @@ class WorkerDialog(CrudDialogBase):
         if user:
             msg += f' 及其关联账号 "{user["username"]}"'
         msg += '？'
-        if not messagebox.askyesno('确认', msg):
+        if not messagebox.askyesno('确认', msg, parent=self.top):
             return
         if user:
             UserRepository.delete(user['username'])
         WorkerService.delete(wid)
-        self.refresh()
+        self._save_and_refresh()
         msg2 = f'工人 "{vals[0]}" 已删除'
         if user:
             msg2 += f'，关联账号 "{user["username"]}" 已同步删除'
-        messagebox.showinfo('成功', msg2)
+        messagebox.showinfo('成功', msg2, parent=self.top)
 
     def _on_delete_account_only(self):
         """仅删除选中工人关联的账号，不删工人"""
         sel = self.tree.selection()
         if not sel:
-            messagebox.showinfo('提示', '请先选择一个工人')
+            messagebox.showinfo('提示', '请先选择一个工人', parent=self.top)
             return
         item = sel[0]
         vals = self.tree.item(item, 'values')
@@ -154,10 +156,10 @@ class WorkerDialog(CrudDialogBase):
         from models.user import UserRepository
         user = UserRepository.get_by_worker_id(wid)
         if not user:
-            messagebox.showinfo('提示', f'工人 "{vals[0]}" 没有关联的账号')
+            messagebox.showinfo('提示', f'工人 "{vals[0]}" 没有关联的账号', parent=self.top)
             return
-        if not messagebox.askyesno('确认', f'确定仅删除工人 "{vals[0]}" 关联的账号 "{user["username"]}"？工人本身不会被删除。'):
+        if not messagebox.askyesno('确认', f'确定仅删除工人 "{vals[0]}" 关联的账号 "{user["username"]}"？工人本身不会被删除。', parent=self.top):
             return
         UserRepository.delete(user['username'])
-        self.refresh()
-        messagebox.showinfo('成功', f'账号 "{user["username"]}" 已删除，工人 "{vals[0]}" 保留')
+        self._save_and_refresh()
+        messagebox.showinfo('成功', f'账号 "{user["username"]}" 已删除，工人 "{vals[0]}" 保留', parent=self.top)
