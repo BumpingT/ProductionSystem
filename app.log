@@ -1547,3 +1547,10 @@
 2026-07-23 09:00:54,357 [INFO] prod_sys:20: 数据库已连接: C:\Users\Administrator\Documents\Recording\data.db
 2026-07-23 09:00:54,358 [INFO] prod_sys:125: 数据库初始化完成
 2026-07-23 09:00:54,358 [INFO] prod_sys:28: 数据库已关闭
+2026-07-23 09:16:40,776 [INFO] prod_sys:20: 数据库已连接: C:\Users\Administrator\Documents\Recording\data.db
+2026-07-23 09:16:40,776 [INFO] prod_sys:69: 删除用户: testuser123
+2026-07-23 09:16:40,795 [INFO] prod_sys:39: 添加用户: testuser123
+2026-07-23 09:16:40,812 [INFO] prod_sys:18: 用户 testuser123 登录成功
+2026-07-23 09:16:40,829 [WARNING] prod_sys:16: 登录失败：用户 testuser123 密码错误
+2026-07-23 09:16:40,829 [WARNING] prod_sys:13: 登录失败：用户 TESTUSER123 不存在
+2026-07-23 09:16:40,830 [INFO] prod_sys:69: 删除用户: testuser123

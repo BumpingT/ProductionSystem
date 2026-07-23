@@ -264,7 +264,10 @@ class DashboardView:
         if self.current_user:
             un = self.current_user.get('username', '')
             dn = self.current_user.get('display_name', '')
-            Label(bt, text=f'当前用户: {dn} ({un})', bg='white', fg='#888',
+            role_en = self.current_user.get('role', '')
+            from config import ROLE_NAMES
+            role_cn = ROLE_NAMES.get(role_en, role_en)
+            Label(bt, text=f'当前用户: {dn} ({un}) - {role_cn}', bg='white', fg='#888',
                   font=('Microsoft YaHei', 8)).pack(side=LEFT, padx=12)
         Button(bt, text='修改密码', bg='#2980b9', fg='white',
                font=('Microsoft YaHei', 9, 'bold'), relief='flat',

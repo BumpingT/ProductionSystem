@@ -56,7 +56,7 @@ class UserDialog:
         r2.pack(fill='x')
         Label(r2, text='角色:', bg=CARD, font=('Microsoft YaHei', 9)).pack(side=LEFT)
         self.cb_role = ttk.Combobox(r2, values=['生产工人', '组长', '生产部部长', '管理员'],
-                                     state='readonly', width=12)
+                                     state='normal', width=12)
         self.cb_role.pack(side=LEFT, padx=(2, 8))
         self.cb_role.set('生产工人')
         
@@ -81,7 +81,8 @@ class UserDialog:
         self._toggle_group()
         self.cb_role.bind('<<ComboboxSelected>>', lambda e: self._toggle_group())
         
-        Label(r2, text='关联工人:', bg=CARD, font=('Microsoft YaHei', 9)).pack(side=LEFT)
+        self._worker_frame = Frame(r2, bg=CARD)
+        Label(self._worker_frame, text='关联工人:', bg=CARD, font=('Microsoft YaHei', 9)).pack(side=LEFT)
         try:
             workers = WorkerRepository.get_all()
             self._worker_list = workers
@@ -90,9 +91,10 @@ class UserDialog:
             logger.error(f'获取工人列表失败: {e}')
             self._worker_list = []
             wvals = ['(无)']
-        self.cb_worker = ttk.Combobox(r2, values=wvals, state='readonly', width=15)
+        self.cb_worker = ttk.Combobox(self._worker_frame, values=wvals, state='readonly', width=15)
         self.cb_worker.pack(side=LEFT, padx=(2, 4))
         self.cb_worker.set('(无)')
+        self._worker_frame.pack(side=LEFT)
         
         # 保存完整工人列表
         self._all_workers = self._worker_list[:]
@@ -120,6 +122,14 @@ class UserDialog:
     def _toggle_group(self):
         """组别下拉框始终可用"""
         self.cb_group.config(state='normal')
+        # 关联工人仅对生产工人显示
+        is_worker = self.cb_role.get() == '生产工人'
+        if hasattr(self, '_worker_frame'):
+            if is_worker:
+                self._worker_frame.pack(side=LEFT)
+            else:
+                self._worker_frame.pack_forget()
+                self.cb_worker.set('(无)')
         self._update_worker_list()
 
     def _update_worker_list(self):
@@ -175,11 +185,11 @@ class UserDialog:
     def _on_add(self):
         """添加用户"""
         username = self.e_user.get().strip()
-        password = self.e_pw.get()
+        password = self.e_pw.get().strip()
         display = username  # 显示名不再单独设置
         role_cn = self.cb_role.get()
-        # 中文角色名转英文存储
-        role = ROLE_NAMES_REV.get(role_cn, 'worker')
+        # 中文角色名转英文存储（自定义角色直接存储）
+        role = ROLE_NAMES_REV.get(role_cn, role_cn)
         widx = self.cb_worker.current()
         worker_id = 0
         if widx > 0 and widx <= len(self._worker_list):
@@ -243,7 +253,7 @@ class UserDialog:
         f.pack(padx=20)
         
         Label(f, text='角色:', bg=CARD, font=('Microsoft YaHei', 9)).grid(row=0, column=0, sticky=W, pady=3)
-        cb_r = ttk.Combobox(f, values=['生产工人', '组长', '生产部部长', '管理员'], state='readonly', width=18)
+        cb_r = ttk.Combobox(f, values=['生产工人', '组长', '生产部部长', '管理员'], state='normal', width=18)
         role_cn = ROLE_NAMES.get(user.get('role', 'worker'), '生产工人')
         cb_r.set(role_cn)
         cb_r.grid(row=0, column=1, pady=3, padx=(4, 0))
@@ -277,8 +287,8 @@ class UserDialog:
         def do_save():
             rl_cn = cb_r.get()
             role_map = ROLE_NAMES_REV
-            rl = role_map.get(rl_cn, 'worker')
-            npw = e_pw.get()
+            rl = role_map.get(rl_cn, rl_cn)  # 自定义角色直接存储
+            npw = e_pw.get().strip()
             gv = cb_g.get()
             gp = gv if gv != '(无)' else ''
             UserRepository.update_profile(un, un, rl, user.get('worker_id', 0), gp)
