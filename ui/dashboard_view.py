@@ -701,9 +701,13 @@ class DashboardView:
             pa = []
             # 用户权限过滤（组长按组，工人按自己）
             if self.current_user:
-                if self.current_user.get('role') == 'worker' and self.current_user.get('worker_id'):
-                    wh.append("r.worker_id=?")
-                    pa.append(self.current_user['worker_id'])
+                if self.current_user.get('role') == 'worker':
+                    wid = self.current_user.get('worker_id')
+                    if wid:
+                        wh.append("r.worker_id=?")
+                        pa.append(wid)
+                    else:
+                        wh.append("1=0")
                 elif self.current_user.get('role') == 'leader':
                     from models.user import UserRepository as U3
                     lw_ids = U3.get_leader_workers(self.current_user['username'])
