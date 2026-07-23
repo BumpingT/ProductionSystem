@@ -9,7 +9,6 @@ import os
 from config import BG, CARD, PRIMARY, ACCENT, GREEN, RED, DARK, YEN, _BASE
 from services.chart_service import gen_report
 from services.export_service import export_excel
-from services.process_service import ProcessService
 from ui.dialogs.user_dialog import UserDialog
 from ui.dialogs.edit_record_dialog import EditRecordDialog
 from ui.dialogs.change_password_dialog import ChangePasswordDialog
@@ -23,6 +22,19 @@ from ui.dialogs.material_dialog import MaterialDialog
 from ui.dialogs.worker_dialog import WorkerDialog
 from ui.dialogs.process_dialog import ProcessDialog
 from utils.logger import logger
+
+
+def _format_process_display(p: dict) -> str:
+    """格式化工序显示文本：编号(名称)-版本 / 工序名"""
+    ver = f"-{p.get('material_version', '')}" if p.get('material_version') else ''
+    return f"{p['material_code']}({p.get('material_name', '')}){ver} / {p['process_name']}"
+
+
+# ── 工具函数 ──
+def _fmt_process(p):
+    """格式化工序显示文本：编号(名称)-版本 / 工序名"""
+    ver = f"-{p.get('material_version', '')}" if p.get('material_version') else ''
+    return f"{p['material_code']}({p.get('material_name', '')}){ver} / {p['process_name']}"
 
 
 class DashboardView:
@@ -132,20 +144,29 @@ class DashboardView:
         self._filter_date_to.bind('<Button-1>', lambda e: self._show_calendar(self._filter_date_to))
         Label(filter_bar, text='工人', bg=CARD, fg='#666',
               font=('Microsoft YaHei', 9)).pack(side=LEFT, padx=(4, 0))
-        self._filter_worker = ttk.Combobox(filter_bar, values=[], state='readonly', width=10)
+        self._filter_worker = ttk.Combobox(filter_bar, values=[], width=10,
+                                            postcommand=self._filter_worker_search)
         self._filter_worker.pack(side=LEFT, padx=(2, 4))
         Label(filter_bar, text='工序', bg=CARD, fg='#666',
               font=('Microsoft YaHei', 9)).pack(side=LEFT, padx=(4, 0))
-        self._filter_process = ttk.Combobox(filter_bar, values=[], state='readonly', width=14)
+        self._filter_process = ttk.Combobox(filter_bar, values=[], width=22,
+                                            postcommand=self._filter_process_search)
         self._filter_process.pack(side=LEFT, padx=(2, 4))
         Button(filter_bar, text='查询', bg=PRIMARY, fg='white',
                font=('Microsoft YaHei', 9, 'bold'), relief='flat',
                padx=8, cursor='hand2',
                command=self._apply_filter).pack(side=LEFT, padx=(4, 0))
-        Button(filter_bar, text='重置', bg='#999', fg='white',
+        Button(filter_bar, text='重置', bg='#7f8c8d', fg='white',
                font=('Microsoft YaHei', 9, 'bold'), relief='flat',
                padx=8, cursor='hand2',
                command=self._reset_filter).pack(side=LEFT, padx=(4, 0))
+        Label(filter_bar, text='排序', bg=CARD, fg='#666',
+              font=('Microsoft YaHei', 9)).pack(side=LEFT, padx=(6, 0))
+        self._filter_sort = ttk.Combobox(filter_bar, values=['最新优先', '最早优先'],
+                                          state='readonly', width=9)
+        self._filter_sort.set('最新优先')
+        self._filter_sort.pack(side=LEFT, padx=(2, 4))
+        self._filter_sort.bind('<<ComboboxSelected>>', lambda e: self._apply_filter())
 
         # ── Record entry form ──
         fm = Frame(main, bg=CARD, highlightbackground='#ddd',
@@ -155,6 +176,14 @@ class DashboardView:
               bg=CARD, fg=DARK).pack(anchor=W)
         row = Frame(fm, bg=CARD)
         row.pack(fill=X, pady=(6, 0))
+
+        fid = Frame(row, bg=CARD)
+        fid.pack(side=LEFT, padx=(0, 8))
+        Label(fid, text='ID（留空自动填充）', bg=CARD, fg='#666',
+              font=('Microsoft YaHei', 9)).pack(anchor=W, padx=(2, 0))
+        self.e_id = Entry(fid, width=8, font=('Microsoft YaHei', 11),
+                          relief='solid', bd=1, justify=CENTER)
+        self.e_id.pack()
 
         fw = Frame(row, bg=CARD)
         fw.pack(side=LEFT, padx=(0, 8))
@@ -235,11 +264,11 @@ class DashboardView:
                                             'group', 'qty', 'price', 'wage', 'date'),
                                    show='headings', height=12)
         col_defs = [('id', 'ID', 40), ('material', '物料', 80), ('process', '工序', 100),
-                    ('worker', '姓名', 70), ('group', '组别', 70), ('qty', '件数', 60),
-                    ('price', '单价', 60), ('wage', '工价', 70), ('date', '日期', 100)]
+                    ('worker', '姓名', 70), ('group', '班组', 70), ('qty', '件数', 60),
+                    ('price', '工价', 60), ('wage', '总价', 70), ('date', '日期', 100)]
         for col, text, w in col_defs:
             self._tree.heading(col, text=text)
-            self._tree.column(col, width=w, anchor=CENTER if col in ('id', 'qty', 'price', 'wage', 'date') else W)
+            self._tree.column(col, width=w, anchor=CENTER)
         self._tree.pack(side=LEFT, fill=BOTH, expand=True)
         vsb = Scrollbar(tree_frame, orient=VERTICAL, command=self._tree.yview)
         self._tree.configure(yscrollcommand=vsb.set)
@@ -288,9 +317,11 @@ class DashboardView:
         wid = self._worker_ids[sel] if sel < len(self._worker_ids) else 0
         if wid in self._worker_procs and self._worker_procs[wid]:
             procs = self._worker_procs[wid]
-            self.cb_process['values'] = [f"{p['material']} - {p['process_name']}" for p in procs]
+            self.cb_process['values'] = [
+                _format_process_display(p) for p in procs
+            ]
         else:
-            self.cb_process['values'] = ['(请联系管理员分配工序)']
+            self.cb_process['values'] = ['(暂无可用工序)']
         self.cb_process.set('')
 
     def _on_process_sel(self, ev):
@@ -302,10 +333,23 @@ class DashboardView:
             widsel = self._worker_ids[wid]
             procs = self._worker_procs.get(widsel, [])
             if sel < len(procs):
-                self.price_label.config(text=f"单价: {YEN}{procs[sel]['unit_price']}")
+                self.price_label.config(text=f'工价: {YEN}{procs[sel]["unit_price"]}')
 
     # ── CRUD operations ──
     def _do_add(self):
+        # 获取自定义ID（可选）
+        id_s = self.e_id.get().strip()
+        custom_id = None
+        if id_s:
+            try:
+                custom_id = int(id_s)
+                if custom_id < 1:
+                    messagebox.showinfo('提示', 'ID必须为正整数')
+                    return
+            except ValueError:
+                messagebox.showinfo('提示', 'ID必须为正整数（留空则自动生成）')
+                return
+
         wid = self.cb_worker.current()
         pid = self.cb_process.current()
         qty_s = self.e_qty.get().strip()
@@ -332,12 +376,20 @@ class DashboardView:
             proc = self._worker_procs[widsel][pid]
             proc_id = proc['id']
             price = proc['unit_price']
-        if RecordRepository.add(widsel, proc_id, qty, price, d):
+
+        ok = False
+        if custom_id:
+            ok = RecordRepository.add_with_id(custom_id, widsel, proc_id, qty, price, d)
+        else:
+            ok = RecordRepository.add(widsel, proc_id, qty, price, d)
+
+        if ok:
+            self.e_id.delete(0, END)
             self.e_qty.delete(0, END)
             self.refresh()
             messagebox.showinfo('成功', '记录已添加')
         else:
-            messagebox.showerror('错误', '添加失败')
+            messagebox.showerror('错误', '添加失败，ID可能已被占用')
 
     def _delete_selected(self):
         sel = self._tree.selection()
@@ -390,18 +442,14 @@ class DashboardView:
         else:
             all_workers = WorkerRepository.get_all()
 
-        # Load workers and processes
+        # Load all processes (worker-process assignment removed)
         self._worker_ids = []
         self._worker_procs = {}
+        all_procs = ProcessRepository.get_all()
         for w in all_workers:
             self._worker_ids.append(w['id'])
-            assigned_ids = ProcessService.get_worker_processes(w['id'])
-            all_procs = ProcessRepository.get_all()
-            if assigned_ids:
-                procs = [p for p in all_procs if p['id'] in assigned_ids]
-            else:
-                procs = []  # 未分配工序则不可选
-            self._worker_procs[w['id']] = procs
+            # Show all processes for every worker
+            self._worker_procs[w['id']] = all_procs
 
         if hasattr(self, 'cb_worker') and self.cb_worker:
             self.cb_worker['values'] = [w['name'] for w in all_workers]
@@ -423,12 +471,16 @@ class DashboardView:
 
         # 填充筛选栏下拉框
         if hasattr(self, '_filter_worker'):
-            self._filter_worker['values'] = ['(全部)'] + [w['name'] for w in all_workers]
+            names = [w['name'] for w in all_workers]
+            self._filter_worker_names = names
+            self._filter_worker['values'] = ['(全部)'] + names
             if not self._filter_worker.get():
                 self._filter_worker.set('(全部)')
         if hasattr(self, '_filter_process'):
-            all_procs = ProcessRepository.get_all()
-            proc_names = sorted(set(p['material'] + ' - ' + p['process_name'] for p in all_procs))
+            proc_names = sorted(set(
+                _fmt_process(p) for p in all_procs
+            ))
+            self._filter_proc_names = proc_names
             self._filter_process['values'] = ['(全部)'] + proc_names
             if not self._filter_process.get():
                 self._filter_process.set('(全部)')
@@ -436,15 +488,51 @@ class DashboardView:
         # Refresh table
         self._refresh_table()
 
+    def _filter_process_search(self, ev=None):
+        """工序下拉搜索过滤"""
+        kw = self._filter_process.get()
+        names = getattr(self, '_filter_proc_names', [])
+        if not kw or kw == '(全部)':
+            self._filter_process['values'] = ['(全部)'] + names
+        else:
+            matched = ['(全部)'] + [n for n in names if kw.lower() in n.lower()]
+            self._filter_process['values'] = matched
+
+    def _filter_worker_search(self, ev=None):
+        """工人下拉搜索过滤"""
+        kw = self._filter_worker.get()
+        names = getattr(self, '_filter_worker_names', [])
+        if not kw or kw == '(全部)':
+            self._filter_worker['values'] = ['(全部)'] + names
+        else:
+            matched = ['(全部)'] + [n for n in names if kw.lower() in n.lower()]
+            self._filter_worker['values'] = matched
+
+    def _get_order_sql(self, default_desc=True):
+        """根据排序选择器返回 ORDER BY 子句"""
+        sort = getattr(self, '_filter_sort', None)
+        if sort and sort.get() == '最早优先':
+            return 'ORDER BY r.record_date ASC, r.id ASC'
+        if default_desc:
+            return 'ORDER BY r.id DESC'
+        return ''
+
     def _refresh_table(self):
         if not self._tree:
             return
         self._tree.delete(*self._tree.get_children())
-        records = RecordRepository.get_all(self.current_user)
+        records = RecordRepository.get_all(self.current_user, order_sql=self._get_order_sql())
         for r in records[:200]:
             wage = r['quantity'] * r['unit_price']
+            # 格式化物料显示
+            from models.material import MaterialRepository
+            mat_display = r.get('material_code', '') or ''
+            mat = MaterialRepository.get_by_code(r.get('material_code', '')) if r.get('material_code') else None
+            if mat:
+                ver = f"-{mat['version']}" if mat['version'] else ''
+                mat_display = f"{mat['code']}({mat['name']}){ver}"
             item = self._tree.insert('', END, values=(
-                r['id'], r['material'], r['process_name'], r['worker_name'],
+                r['id'], mat_display, r['process_name'], r['worker_name'],
                 r['group_name'], r['quantity'], f'{YEN}{r["unit_price"]}',
                 f'{YEN}{round(wage, 2)}', r['record_date']
             ))
@@ -494,22 +582,31 @@ class DashboardView:
                 wh.append("w.name=?")
                 pa.append(wf)
             if pf and pf != '(全部)':
-                if ' - ' in pf:
-                    mat, proc = pf.split(' - ', 1)
-                    wh.append("p.material=? AND p.process_name=?")
-                    pa.extend([mat, proc])
+                if ' / ' in pf:
+                    mat_part, proc = pf.split(' / ', 1)
+                    # 物料部分格式：编号(名称)-版本，提取编号
+                    mat_code = mat_part.split('(')[0].strip()
+                    wh.append("p.material_code=? AND p.process_name=?")
+                    pa.extend([mat_code, proc])
             ws = " WHERE " + " AND ".join(wh) if wh else ""
             rows = conn.execute(f"""SELECT r.*, w.name AS worker_name, w.group_name,
-                    p.material, p.process_name
+                    p.material_code, p.process_name
                     FROM records r
                     LEFT JOIN workers w ON r.worker_id = w.id
                     LEFT JOIN processes p ON r.process_id = p.id
                     {ws}
-                    ORDER BY r.id DESC LIMIT 500""", pa).fetchall()
+                    {self._get_order_sql()} LIMIT 500""", pa).fetchall()
             for r in rows:
                 wage = r['quantity'] * r['unit_price']
+                # 获取物料名称用于显示
+                from models.material import MaterialRepository
+                mat = MaterialRepository.get_by_code(r['material_code']) if r['material_code'] else None
+                mat_display = r['material_code'] or ''
+                if mat:
+                    ver = f"-{mat['version']}" if mat['version'] else ''
+                    mat_display = f"{mat['code']}({mat['name']}){ver}"
                 self._tree.insert('', END, values=(
-                    r['id'], r['material'], r['process_name'], r['worker_name'],
+                    r['id'], mat_display, r['process_name'], r['worker_name'],
                     r['group_name'], r['quantity'], f'{YEN}{r["unit_price"]}',
                     f'{YEN}{round(wage, 2)}', r['record_date']
                 ))
@@ -598,8 +695,8 @@ class DashboardView:
 
         tr = ttk.Treeview(top, columns=('name', 'group', 'qty', 'wage'),
                           show='headings', height=10)
-        for col, text, w in [('name', '工人', 100), ('group', '组别', 100),
-                              ('qty', '件数', 80), ('wage', '工价', 100)]:
+        for col, text, w in [('name', '工人', 100), ('group', '班组', 100),
+                              ('qty', '件数', 80), ('wage', '总价', 100)]:
             tr.heading(col, text=text)
             tr.column(col, width=w)
         tr.pack(fill=BOTH, expand=True, padx=10, pady=10)
@@ -819,7 +916,7 @@ class DashboardView:
 
         workers = WorkerRepository.get_all()
         cb_worker = ttk.Combobox(ff, values=['全部'] + [w['name'] for w in workers],
-                                 state='readonly', width=10)
+                                 width=10)
         cb_worker.pack(side=LEFT, padx=(4, 4))
         cb_worker.set('全部')
 
@@ -841,10 +938,10 @@ class DashboardView:
 
         tr = ttk.Treeview(top, columns=('worker', 'group', 'qty', 'wage'),
                           show='headings', height=12)
-        for col, text, w in [('worker', '工人', 120), ('group', '组别', 120),
-                              ('qty', '件数', 100), ('wage', '工价', 120)]:
+        for col, text, w in [('worker', '工人', 120), ('group', '班组', 120),
+                              ('qty', '件数', 100), ('wage', '总价', 120)]:
             tr.heading(col, text=text)
-            tr.column(col, width=w)
+            tr.column(col, width=w, anchor='center')
         tr.pack(fill=BOTH, expand=True, padx=16, pady=(8, 4))
 
         def do_query_table():

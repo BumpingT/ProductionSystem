@@ -1,426 +1,386 @@
-# 生产管理系统 — 架构设计文档
+# 生产管理系统 — 架构设计文档（v2.0 业务重构）
 
-> 版本 1.0 | 2026-07
+> 版本 2.0 | 2026-07
 
 ---
 
-## 1. 技术选型
-
-### 1.1 技术栈
+## 1. 技术选型（保持不变）
 
 | 层级 | 技术 | 版本 | 说明 |
 |------|------|------|------|
-| 编程语言 | Python | 3.10+ | 跨平台、开发效率高、生态丰富 |
-| GUI 框架 | Tkinter (ttk) | 标准库 | 无需额外安装，轻量级，Windows 原生集成 |
-| 数据库 | SQLite 3 | 标准库 | 零配置，单文件存储，适合桌面单机应用 |
-| 图表 | ECharts | 5.x | 高性能 JS 图表库，通过 `webbrowser` 展示 |
-| Excel 导出 | openpyxl | 3.x | 按需安装，读写 .xlsx 文件 |
-| 打包工具 | PyInstaller | 6.x | 将 Python 应用打包为独立 exe |
-| 日志 | logging (标准库) | - | 标准日志框架，支持多 handler |
-| 密码学 | hashlib (标准库) | - | PBKDF2-SHA256 密码哈希 |
-
-### 1.2 选型理由
-
-| 选择 | 理由 |
-|------|------|
-| Python | 团队熟悉度最高，Tkinter GUI 开发最快捷 |
-| Tkinter | 零依赖、与 Windows 原生外观一致、打包体积小（~10MB vs Electron ~150MB） |
-| SQLite | 桌面单用户场景无需网络数据库，无部署成本 |
-| ECharts | 功能丰富、交互流畅，HTML 方式可离线运行 |
-| openpyxl | 纯 Python 读写 Excel，无需安装 Office |
-| PBKDF2-SHA256 | 业界标准密码哈希算法，抗暴力破解 |
+| 编程语言 | Python | 3.10+ | 无变化 |
+| GUI 框架 | Tkinter (ttk) | 标准库 | 无变化 |
+| 数据库 | SQLite 3 | 标准库 | 无变化 |
+| 图表 | ECharts | 5.x | 无变化 |
+| Excel 导出 | openpyxl | 3.x | 无变化 |
+| 日志 | logging | 标准库 | 无变化 |
+| 密码 | PBKDF2-SHA256 | 标准库 | 无变化 |
 
 ---
 
-## 2. 系统分层架构
-
-### 2.1 架构总览
+## 2. 分层架构（保持不变）
 
 ```
-┌─────────────────────────────────────────────────────────────┐
-│                     UI 层 (ui/)                              │
-│  ┌──────────────┐  ┌──────────────┐  ┌──────────────────┐  │
-│  │ main.py      │  │ dialogs/     │  │ widgets/         │  │
-│  │ (入口+主窗口) │  │ material     │  │ crud_dialog_base │  │
-│  │              │  │ worker       │  │ table_widget     │  │
-│  │              │  │ process      │  │ stats_bar        │  │
-│  │              │  │ user         │  │                  │  │
-│  │              │  │ permission   │  │                  │  │
-│  │              │  │ summary      │  │                  │  │
-│  │              │  │ calendar     │  │                  │  │
-│  └──────────────┘  └──────────────┘  └──────────────────┘  │
-│                           │                                  │
-│                           ▼                                  │
-├─────────────────────────────────────────────────────────────┤
-│                 业务逻辑层 (services/)                        │
-│  ┌──────────────┐  ┌──────────────┐  ┌──────────────────┐  │
-│  │ AuthService  │  │ StatsService │  │ ExportService    │  │
-│  │ (登录/权限)   │  │ (统计计算)    │  │ (Excel导出)      │  │
-│  │              │  │              │  │                  │  │
-│  └──────────────┘  └──────────────┘  └──────────────────┘  │
-│                           │              (ChartService)     │
-│                           ▼                                  │
-├─────────────────────────────────────────────────────────────┤
-│                 数据访问层 (models/)                          │
-│  ┌──────────────┐  ┌──────────────┐  ┌──────────────────┐  │
-│  │ MaterialRepo │  │ WorkerRepo   │  │ ProcessRepo      │  │
-│  │ RecordRepo   │  │ UserRepo     │  │ Database (连接)   │  │
-│  └──────────────┘  └──────────────┘  └──────────────────┘  │
-│                           │                                  │
-│                           ▼                                  │
-├─────────────────────────────────────────────────────────────┤
-│                   数据存储层                                   │
-│  ┌────────────────────────────────────────────────────────┐ │
-│  │                 SQLite (data.db)                        │ │
-│  └────────────────────────────────────────────────────────┘ │
-└─────────────────────────────────────────────────────────────┘
-
-                   工具层 (utils/)
-┌─────────────────────────────────────────────────────────────┐
-│  auth.py (密码哈希)  │  logger.py (日志)  │ error_handler   │
-└─────────────────────────────────────────────────────────────┘
-
-                   配置层 (config.py)
-┌─────────────────────────────────────────────────────────────┐
-│  颜色主题  │  路径配置  │  权限定义  │  角色定义             │
-└─────────────────────────────────────────────────────────────┘
-```
-
-### 2.2 各层职责
-
-| 层次 | 职责 | 依赖 |
-|------|------|------|
-| **UI层** | 用户交互、事件处理、界面渲染 | → 调用 Service 层 |
-| **Service层** | 业务逻辑编排、验证、计算 | → 调用 Repository 层 |
-| **Repository层** | 数据 CRUD、SQL 封装 | → 调用 Database 连接 |
-| **Database** | 连接管理、事务、表初始化 | → SQLite 文件 |
-| **Utils** | 跨层通用工具函数 | 无业务依赖 |
-| **Config** | 全局常量定义 | 无依赖 |
-
-### 2.3 依赖方向
-
-```
-UI ──→ Service ──→ Repository ──→ Database
-  │                    │
-  └────→ Utils ←───────┘
-         │
-         └────→ Config
-```
-
-**核心原则**：依赖方向永远从上层指向下层，下层不依赖上层。
-
----
-
-## 3. 模块设计
-
-### 3.1 模块清单
-
-| 模块 | 文件 | 类/函数 | 职责 |
-|------|------|---------|------|
-| **config** | `config.py` | - | 颜色、路径、权限、角色常量 |
-| **models.database** | `models/database.py` | `Database` | 连接管理、表初始化、种子数据 |
-| **models.material** | `models/material.py` | `MaterialRepository` | 物料 CRUD |
-| **models.worker** | `models/worker.py` | `WorkerRepository` | 工人 CRUD |
-| **models.process** | `models/process.py` | `ProcessRepository` | 工序 CRUD |
-| **models.record** | `models/record.py` | `RecordRepository` | 记录 CRUD + 统计查询 |
-| **models.user** | `models/user.py` | `UserRepository` | 用户 + 权限 CRUD |
-| **services.auth** | `services/auth_service.py` | `AuthService` | 登录验证、密码修改、权限检查 |
-| **services.stats** | `services/stats_service.py` | `StatsService` | 统计计算、月度汇总 |
-| **services.export** | `services/export_service.py` | `export_excel()` | Excel 导出 |
-| **services.chart** | `services/chart_service.py` | `_chart_html()`, `gen_report()` | 图表 HTML 生成 |
-| **utils.auth** | `utils/auth.py` | `hash_password()`, `verify_password()` | 密码哈希 |
-| **utils.logger** | `utils/logger.py` | `logger` | 日志实例 |
-| **utils.error_handler** | `utils/error_handler.py` | `setup_global_handler()`, `safe_call()` | 全局异常处理 |
-| **ui.widgets.crud_base** | `ui/widgets/crud_dialog_base.py` | `CrudDialogBase` | CRUD 对话框基类 |
-| **ui.dialogs.material** | `ui/dialogs/material_dialog.py` | `MaterialDialog` | 物料管理对话框 |
-| **ui.dialogs.worker** | `ui/dialogs/worker_dialog.py` | `WorkerDialog` | 工人管理对话框 |
-| **ui.dialogs.process** | `ui/dialogs/process_dialog.py` | `ProcessDialog` | 工序管理+工人分配 |
-| **main** | `main.py` | `App` | 应用入口+主窗口UI |
-
-### 3.2 接口定义
-
-```
-┌─────────────────────────────────────────────────────┐
-│                  Service 层接口                       │
-├─────────────────────────────────────────────────────┤
-│ AuthService                                         │
-│   +login(username, password) → dict|None            │
-│   +change_password(un, old, new) → (bool, str)      │
-│   +get_permissions(username) → dict                 │
-│   +has_permission(username, perm_key) → bool        │
-│                                                     │
-│ StatsService                                        │
-│   +get_summary(start, end, process, worker) → dict  │
-│   +get_monthly_stats(month) → dict                  │
-│   +list_months() → list[str]                        │
-│                                                     │
-│ export_excel(stats, filepath, title) → bool         │
-│ gen_report(stats, title) → None  (opens browser)    │
-└─────────────────────────────────────────────────────┘
-
-┌─────────────────────────────────────────────────────┐
-│                Repository 层接口                      │
-├─────────────────────────────────────────────────────┤
-│ MaterialRepository                                  │
-│   +get_all() → list[dict]                           │
-│   +add(name, price) → bool                          │
-│   +update(id, name, price)                          │
-│   +delete(id)                                       │
-│                                                     │
-│ WorkerRepository                                    │
-│   +get_all() → list[dict]                           │
-│   +add(name, group) → bool                          │
-│   +update(id, name, group)                          │
-│   +delete(id)                                       │
-│                                                     │
-│ ProcessRepository                                   │
-│   +get_all() → list[dict]                           │
-│   +add(material, process_name, unit_price) → bool   │
-│   +update(id, material, process_name, unit_price)   │
-│   +delete(id)                                       │
-│                                                     │
-│ RecordRepository                                    │
-│   +get_all(user) → list[dict]                       │
-│   +add(worker_id, process_id, qty, price, date)→bool│
-│   +update(id, worker_id, process_id, qty, price, dt)│
-│   +delete(id)                                       │
-│   +get_stats(start, end, process, worker) → dict    │
-│   +list_months() → list[str]                        │
-│   +get_worker_processes(worker_id) → list[int]      │
-│   +assign_worker_process(worker_id, process_id)     │
-│   +unassign_worker_process(worker_id, process_id)   │
-│                                                     │
-│ UserRepository                                      │
-│   +get_all() → list[dict]                           │
-│   +get_by_username(username) → dict|None            │
-│   +get_by_worker_id(worker_id) → dict|None          │
-│   +add(username, password, display_name, role, wid) │
-│   +update_password(username, new_password)          │
-│   +update_profile(username, display, role, worker)  │
-│   +delete(username) → bool                          │
-│   +get_permissions(username) → dict                 │
-│   +set_permission(username, perm_key, allowed)      │
-└─────────────────────────────────────────────────────┘
+UI 层 (ui/)          →  对话框、主面板
+Service 层 (services/) →  业务逻辑编排
+Repository 层 (models/) → 数据 CRUD
+Database (SQLite)      →  持久存储
+Utils (utils/)         →  工具函数
 ```
 
 ---
 
-## 4. 数据设计
+## 3. 数据库表结构变更
 
-### 4.1 数据库表结构
+### 3.1 materials 表重构
 
 ```sql
--- 物料表
+-- 原表（v1.0）
 CREATE TABLE materials (
-    id          INTEGER PRIMARY KEY AUTOINCREMENT,
-    name        TEXT NOT NULL UNIQUE,
-    price       REAL DEFAULT 0
+    id    INTEGER PRIMARY KEY AUTOINCREMENT,
+    name  TEXT NOT NULL UNIQUE,
+    price REAL DEFAULT 0
 );
 
--- 工人表
-CREATE TABLE workers (
-    id          INTEGER PRIMARY KEY AUTOINCREMENT,
-    name        TEXT NOT NULL UNIQUE,
-    group_name  TEXT NOT NULL DEFAULT ''
+-- 新表（v2.0）
+CREATE TABLE materials (
+    id      INTEGER PRIMARY KEY AUTOINCREMENT,
+    code    TEXT NOT NULL UNIQUE,       -- 物料编号，如 TR-001
+    name    TEXT NOT NULL,              -- 物料名称，如 变压器
+    version TEXT NOT NULL DEFAULT '',   -- 版本，如 V1.0
+    UNIQUE(name, version)              -- 同一名称+版本唯一
 );
+```
 
--- 工序表
+**迁移说明**：
+- 去掉 price 字段
+- 增加 code（编号）和 version（版本）字段
+- 旧数据不再兼容，数据库需重建（种子数据重新插入）
+
+### 3.2 processes 表调整
+
+```sql
+-- 原表（v1.0）
 CREATE TABLE processes (
     id           INTEGER PRIMARY KEY AUTOINCREMENT,
-    material     TEXT NOT NULL,
+    material     TEXT NOT NULL,          -- 物料名称（旧）
     process_name TEXT NOT NULL,
     unit_price   REAL NOT NULL DEFAULT 0,
     UNIQUE(material, process_name)
 );
 
--- 工人工序分配表
-CREATE TABLE worker_processes (
+-- 新表（v2.0）
+CREATE TABLE processes (
+    id             INTEGER PRIMARY KEY AUTOINCREMENT,
+    material_code  TEXT NOT NULL,        -- 物料编号（引用materials.code）
+    material_name  TEXT NOT NULL DEFAULT '',  -- 物料名称冗余（用于显示）
+    material_version TEXT NOT NULL DEFAULT '', -- 物料版本冗余
+    process_name   TEXT NOT NULL,
+    unit_price     REAL NOT NULL DEFAULT 0,
+    UNIQUE(material_code, process_name)
+);
+```
+
+**设计考量**：
+- 存储 material_code 引用 materials 表，同时冗余存储 name 和 version
+- 冗余存储避免了每次查询都需要 JOIN，且删除物料后工序仍可显示历史信息
+- 工序列表查询时，物料显示为 "编号(名称)-版本" 格式
+
+### 3.3 worker_processes 表移除
+
+```sql
+-- 原表（v1.0）—— 删除
+DROP TABLE IF EXISTS worker_processes;
+```
+
+工序的工人分配功能已去除，此表及所有相关代码一并移除。
+
+### 3.4 workers 表保持不变
+
+```sql
+CREATE TABLE workers (
     id          INTEGER PRIMARY KEY AUTOINCREMENT,
-    worker_id   INTEGER NOT NULL,
-    process_id  INTEGER NOT NULL,
-    UNIQUE(worker_id, process_id)
-);
-
--- 生产记录表
-CREATE TABLE records (
-    id           INTEGER PRIMARY KEY AUTOINCREMENT,
-    worker_id    INTEGER NOT NULL DEFAULT 0,
-    process_id   INTEGER NOT NULL DEFAULT 0,
-    quantity     REAL NOT NULL,
-    unit_price   REAL NOT NULL,
-    record_date  TEXT NOT NULL,
-    created_at   TEXT DEFAULT (datetime('now','localtime'))
-);
-
--- 用户表
-CREATE TABLE users (
-    id            INTEGER PRIMARY KEY AUTOINCREMENT,
-    username      TEXT NOT NULL UNIQUE,
-    password_hash TEXT NOT NULL,
-    display_name  TEXT NOT NULL DEFAULT '',
-    role          TEXT NOT NULL DEFAULT 'worker',
-    worker_id     INTEGER DEFAULT 0,
-    created_at    TEXT DEFAULT (datetime('now','localtime'))
-);
-
--- 用户权限表
-CREATE TABLE user_permissions (
-    id          INTEGER PRIMARY KEY AUTOINCREMENT,
-    username    TEXT NOT NULL,
-    perm_key    TEXT NOT NULL,
-    allowed     INTEGER NOT NULL DEFAULT 0,
-    UNIQUE(username, perm_key)
-);
-
--- 设置表
-CREATE TABLE settings (
-    key   TEXT PRIMARY KEY,
-    value TEXT
+    name        TEXT NOT NULL UNIQUE,
+    group_name  TEXT NOT NULL DEFAULT ''
 );
 ```
 
-### 4.2 数据流设计
+### 3.5 班组管理（新增独立管理）
 
-#### 登录流程
+不新增表，利用 workers 表的 group_name 字段。
+从 workers 表中 SELECT DISTINCT group_name 获取所有班组列表。
+支持班组 CRUD：
+- 添加班组：写入一条占位记录（或单独管理）
+- 删除班组：删除该班组下所有工人
 
-```
-用户输入凭据 → main.py:do_login()
-                    │
-                    ▼
-              AuthService.login(un, pw)
-                    │
-                    ├─→ UserRepository.get_by_username(un)
-                    │       │
-                    │       ▼
-                    │   [返回用户记录 或 None]
-                    │
-                    ├─→ utils.auth.verify_password(pw, hash)
-                    │       │
-                    │       ▼
-                    │   [True / False]
-                    │
-                    ▼
-               [登录成功/失败]
-                    │
-                    ▼
-              UserRepository.get_permissions(un)
-                    │
-                    ▼
-              self.current_user = user
-              self.user_perms = perms
-                    │
-                    ▼
-              build_ui() → refresh() → _apply_permissions()
+实际实现方式：
+- 班组信息存储在 workers 表的 group_name 中
+- 添加班组时，向 workers 插入一条特殊记录（name='__group__', group_name='班组名'）
+- 或者更简单：班组不单独存表，直接从 workers.group_name 中 DISTINCT 获取
+
+**更优方案**：新建 groups 表
+
+```sql
+CREATE TABLE groups (
+    id   INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL UNIQUE
+);
 ```
 
-#### 添加记录流程
+同时 workers 表增加 group_id 引用 groups.id：
 
-```
-用户填写表单 → main.py:do_add()
-                    │
-                    ├─→ 获取 worker_id, process_id, qty, date
-                    │
-                    ├─→ RecordRepository.add(wid, pid, qty, price, date)
-                    │       │
-                    │       ▼
-                    │   INSERT INTO records ...
-                    │   commit()
-                    │
-                    └─→ refresh()
-                            │
-                            ├─→ RecordRepository.get_all(user)
-                            ├─→ RecordRepository.get_stats()
-                            │
-                            ▼
-                        刷新表格 + 统计卡片
+```sql
+ALTER TABLE workers ADD COLUMN group_id INTEGER DEFAULT 0;
 ```
 
-#### 图表报表流程
+这样班组可以独立管理，工人通过 group_id 关联班组。
 
+但为了最小化改动，使用 workers.group_name 文本字段配合 DISTINCT 获取班组列表，在 UI 层面实现树形展示。
+
+**最终决定**：不新增 groups 表，使用 workers.group_name 配合 DISTINCT 去重获取班组列表。树形结构在 UI 层面实现。
+
+### 3.6 其他表保持不变
+
+records、users、user_permissions、settings、leader_workers 表结构不变。
+
+---
+
+## 4. 模块接口变更
+
+### 4.1 MaterialRepository 接口变更
+
+```python
+# 旧接口
+class MaterialRepository:
+    get_all() → list[dict]           # {id, name, price}
+    add(name, price) → bool
+    update(mid, name, price)
+    delete(mid)
+
+# 新接口
+class MaterialRepository:
+    get_all() → list[dict]           # {id, code, name, version}
+    add(code, name, version) → bool
+    update(mid, code, name, version)
+    delete(mid)
+    get_by_code(code) → dict|None    # 新增：按编号查询
+    search(keyword) → list[dict]     # 新增：关键字搜索
 ```
-用户点击"生成图表报告" → main.py:open_chart()
-                              │
-                              ▼
-                        RecordRepository.get_stats()
-                              │
-                              ▼
-                        chart_service.gen_report(stats, title)
-                              │
-                              ├─→ _chart_html(stats) → HTML string
-                              ├─→ 写入 tempfile/report.html
-                              ├─→ 复制 echarts.min.js 到 temp 目录
-                              └─→ webbrowser.open('file://...')
+
+### 4.2 ProcessRepository 接口变更
+
+```python
+# 旧接口
+class ProcessRepository:
+    get_all() → list[dict]           # {id, material, process_name, unit_price, material_price}
+    add(material, process_name, unit_price) → bool
+    update(pid, material, process_name, unit_price)
+    delete(pid)
+    # 工人工序分配
+    get_worker_processes(worker_id) → list[int]
+    assign_worker_process(worker_id, process_id)
+    unassign_worker_process(worker_id, process_id)
+
+# 新接口
+class ProcessRepository:
+    get_all() → list[dict]           # {id, material_code, material_name, material_version, process_name, unit_price}
+    add(material_code, process_name, unit_price) → bool
+    update(pid, material_code, process_name, unit_price)
+    delete(pid)
+    get_process_names() → list[str]  # 新增：获取所有不重复的工序名
+```
+
+**移除**：get_worker_processes、assign_worker_process、unassign_worker_process
+
+### 4.3 WorkerRepository 接口变更
+
+```python
+# 旧接口
+class WorkerRepository:
+    get_all() → list[dict]           # {id, name, group_name}
+    add(name, group) → bool
+    update(wid, name, group)
+    delete(wid)
+
+# 新接口（新增班组相关方法）
+class WorkerRepository:
+    get_all() → list[dict]           # {id, name, group_name}
+    add(name, group) → bool
+    update(wid, name, group)
+    delete(wid)
+    get_groups() → list[str]         # 新增：获取所有班组（DISTINCT group_name）
+    add_group(group_name) → bool     # 新增：添加班组
+    delete_group(group_name) → bool  # 新增：删除班组（连带删除组内工人）
+```
+
+### 4.4 ProcessService 接口变更
+
+```python
+# 旧接口
+class ProcessService:
+    get_all()
+    add(material, process_name, unit_price)
+    update(pid, material, process_name, unit_price)
+    delete(pid)
+    get_worker_processes(worker_id)
+    assign_worker(worker_id, process_id)
+    unassign_worker(worker_id, process_id)
+
+# 新接口
+class ProcessService:
+    get_all()
+    add(material_code, process_name, unit_price)
+    update(pid, material_code, process_name, unit_price)
+    delete(pid)
+    get_process_names() → list[str]  # 新增
+```
+
+### 4.5 WorkerService 接口变更
+
+```python
+# 新接口
+class WorkerService:
+    get_all()
+    add(name, group)
+    update(wid, name, group)
+    delete(wid)
+    get_groups() → list[str]         # 新增
+    add_group(group_name) → bool     # 新增
+    delete_group(group_name) → bool  # 新增
 ```
 
 ---
 
-## 5. 错误处理策略
+## 5. 数据流变更
 
-### 5.1 层级错误处理
-
-| 层级 | 策略 | 实现 |
-|------|------|------|
-| UI 层 | try-except + messagebox 弹窗 | 每个回调函数内捕获 |
-| Service 层 | 返回 (bool, str) 元组或 None | 上层检查返回值 |
-| Repository 层 | try-except 记录日志 + 返回 False/None | `logger.warning/error` |
-| 全局未捕获 | `sys.excepthook` + tkinter 钩子 | `error_handler.setup_global_handler()` |
-
-### 5.2 日志方案
+### 5.1 物料管理数据流
 
 ```
-日志级别: DEBUG < INFO < WARNING < ERROR < CRITICAL
-
-输出目标:
-  ├── 控制台 (stderr) → 即时查看
-  └── 文件 app.log → 持久化排查
-
-日志格式:
-  控制台: %(asctime)s [%(levelname)s] %(name)s: %(message)s
-  文件:   %(asctime)s [%(levelname)s] %(name)s:%(lineno)d: %(message)s
-
-使用方式:
-  from utils.logger import logger
-  logger.info('用户登录成功')
-  logger.warning('登录失败: 密码错误')
-  logger.error(f'数据库错误: {e}', exc_info=True)
+用户输入编号/名称/版本 → MaterialDialog.on_add()
+    │
+    ▼
+MaterialService.add(code, name, version)
+    │
+    ▼
+MaterialRepository.add(code, name, version)
+    │
+    ▼
+INSERT INTO materials (code, name, version) VALUES (?, ?, ?)
 ```
 
-### 5.3 密码安全
-
-- 使用 PBKDF2-SHA256 哈希，100,000 次迭代
-- 使用 32 字符随机 salt（hex 编码）
-- 存储格式：`salt(32) + hash(64)` 共 96 字符
-- 记住密码功能使用 Base64 编码本地文件存储（仅本地使用）
-
----
-
-## 6. 性能考虑
-
-- 记录列表限制 500 条（`LIMIT 500`），避免大数据量卡顿
-- 数据库使用 WAL 模式（`PRAGMA journal_mode=WAL`）提升并发
-- 统计查询使用 SQL 聚合函数，避免 Python 层计算
-- ECharts 图表通过本地 HTML 渲染，不占用 GUI 线程
-
----
-
-## 7. 部署方案
+### 5.2 工人管理数据流（树形结构）
 
 ```
-打包命令: pyinstaller --onefile --windowed --add-data "echarts.min.js;." main.py
+打开对话框 → WorkerDialog.refresh()
+    │
+    ├─ WorkerRepository.get_groups() → ["装配组","测试组",...]
+    │       │
+    │       ▼  Treeview 插入班组父节点
+    │
+    └─ WorkerRepository.get_all()
+            │
+            ▼  Treeview 插入工人子节点（按班组分组）
 
-输出: dist/ProductionSystem.exe (~10MB)
+添加工人 → on_add()
+    │
+    ├─ 选择班组（下拉框）
+    ├─ 输入姓名
+    ▼
+WorkerRepository.add(name, group_name)
+```
 
-运行依赖:
-  ├── Python 标准库 (自带)
-  ├── openpyxl (可选，导出Excel时需要)
-  └── echarts.min.js (打包在exe中)
+### 5.3 工序管理数据流（搜索+选择）
+
+```
+打开对话框 → ProcessDialog.refresh()
+    │
+    ├─ MaterialRepository.get_all() → 填入物料下拉
+    └─ ProcessRepository.get_all() → 填入工序列表
+
+选择物料 → 下拉搜索过滤
+    │
+    ▼
+输入关键字 → 实时过滤物料列表（按 code/name 匹配）
+
+添加工序 → on_add()
+    │
+    ├─ 物料下拉选中值 → material_code
+    ├─ 工序名下拉/输入 → process_name
+    ├─ 单价输入 → unit_price
+    ▼
+ProcessRepository.add(material_code, process_name, unit_price)
 ```
 
 ---
 
-## 8. 假设点
+## 6. UI 组件变更
 
-- 应用运行在 Windows 10/11 环境
-- 单用户模式，无网络通信需求
-- 数据库文件 `data.db` 与 exe 同级目录
-- 日志文件 `app.log` 与 exe 同级目录
+### 6.1 MaterialDialog 重构
+
+| 项目 | 旧 | 新 |
+|------|-----|-----|
+| 列 | 名称、单价 | 编号、名称、版本 |
+| 添加字段 | 名称 | 编号、名称、版本 |
+| 基类 | CrudDialogBase | CrudDialogBase（保持不变） |
+
+### 6.2 WorkerDialog 重构
+
+| 项目 | 旧 | 新 |
+|------|-----|-----|
+| 显示方式 | 平面表格 | 树形结构（班组→工人） |
+| 列表控件 | ttk.Treeview（表格模式） | ttk.Treeview（树模式） |
+| 添加字段 | 姓名、组别(文本框) | 姓名、班组(下拉选择) |
+| 新功能 | 无 | 添加班组、删除班组按钮 |
+
+### 6.3 ProcessDialog 重构
+
+| 项目 | 旧 | 新 |
+|------|-----|-----|
+| 物料输入 | 文本框(自由输入) | Combobox(可搜索下拉) |
+| 工序输入 | 文本框(自由输入) | Combobox(可搜索+可输入) |
+| 工人分配 | 复选框列表区域 | ❌ 完全移除 |
+| 列表列 | 物料、工序、单价 | 物料、工序、单价 |
+| 物料显示 | 物料名 | 编号(名称)-版本 |
+
+---
+
+## 7. dashboard_view.py 变更
+
+主界面 "添加记录" 表单中，工序下拉列表的显示格式改为：
+```
+TR-001(变压器)-V1.0 / 绕线
+CONT-01(接触器)-A型 / 组装
+```
+
+对应修改 `_on_worker_sel` 和 `_on_process_sel` 中的工序文本组装逻辑。
+
+---
+
+## 8. 错误处理与日志方案（保持不变）
+
+- UI 层：try-except + messagebox
+- Service 层：返回 (bool, str) 或 None
+- Repository 层：logger.warning + 返回 False/None
+- 全局处理：sys.excepthook 钩子
+
+---
+
+## 9. 数据迁移策略
+
+由于表结构发生 breaking changes，需要删除旧数据库文件重新初始化：
+
+```python
+# database.py 中增加版本检测
+# 如果数据库版本不匹配，提示用户备份后重建
+```
+
+实际采用方式：直接修改建表 SQL，删除旧 data.db 自动重建新表。
+种子数据更新为电气行业数据。
+
+---
+
+## 10. 性能考虑
+
+- 班组树形结构加载：一次性加载所有工人，在 Python 层面分组
+- 物料搜索：在 Python 层面过滤（数据量小，<1000条不需要数据库LIKE）
+- 工序下拉缓存：物料和工序名列表在打开对话框时一次性加载

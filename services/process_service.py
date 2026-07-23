@@ -9,18 +9,17 @@ class ProcessService:
         return ProcessRepository.get_all()
 
     @staticmethod
-    def add(material: str, process_name: str, unit_price: float) -> bool:
-        result = ProcessRepository.add(material, process_name, unit_price)
+    def add(material_code: str, process_name: str, unit_price: float) -> bool:
+        result = ProcessRepository.add(material_code, process_name, unit_price)
         if result:
-            logger.info(f'工序添加成功: {material}/{process_name}')
+            logger.info(f'工序添加成功: {material_code}/{process_name}')
         else:
-            logger.warning(f'工序添加失败: {material}/{process_name}')
+            logger.warning(f'工序添加失败: {material_code}/{process_name}')
         return result
 
     @staticmethod
-    def update(pid: int, material: str, process_name: str, unit_price: float):
-        """更新工序信息"""
-        ProcessRepository.update(pid, material, process_name, unit_price)
+    def update(pid: int, material_code: str, process_name: str, unit_price: float):
+        ProcessRepository.update(pid, material_code, process_name, unit_price)
         logger.info(f'工序更新: ID={pid}')
 
     @staticmethod
@@ -29,15 +28,6 @@ class ProcessService:
         logger.info(f'工序删除: ID={pid}')
 
     @staticmethod
-    def get_worker_processes(worker_id: int) -> list[int]:
-        return ProcessRepository.get_worker_processes(worker_id)
-
-    @staticmethod
-    def assign_worker(worker_id: int, process_id: int):
-        ProcessRepository.assign_worker_process(worker_id, process_id)
-        logger.info(f'工人工序分配: worker={worker_id}, process={process_id}')
-
-    @staticmethod
-    def unassign_worker(worker_id: int, process_id: int):
-        ProcessRepository.unassign_worker_process(worker_id, process_id)
-        logger.info(f'工人工序取消分配: worker={worker_id}, process={process_id}')
+    def get_process_names() -> list[str]:
+        """获取所有不重复的工序名称"""
+        return ProcessRepository.get_process_names()

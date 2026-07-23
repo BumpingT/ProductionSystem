@@ -30,10 +30,10 @@ class UserDialog:
         self.tree = ttk.Treeview(self.top, columns=('username', 'role', 'group', 'worker'),
                                   show='headings', height=10)
         col_defs = [('username', '用户名', 120),
-                    ('role', '角色', 80), ('group', '组别', 80), ('worker', '关联工人', 120)]
+                    ('role', '角色', 80), ('group', '班组', 80), ('worker', '关联工人', 120)]
         for col, text, w in col_defs:
             self.tree.heading(col, text=text)
-            self.tree.column(col, width=w)
+            self.tree.column(col, width=w, anchor='center')
         self.tree.pack(fill='both', expand=True, padx=16, pady=(4, 4))
         
         # ── 添加/编辑区域 ──
@@ -73,8 +73,8 @@ class UserDialog:
         except Exception as e:
             logger.error(f'获取组别列表失败: {e}')
         gvals = ['(无)'] + self._group_list
-        Label(r2, text='组别:', bg=CARD, font=('Microsoft YaHei', 9)).pack(side=LEFT)
-        self.cb_group = ttk.Combobox(r2, values=gvals, state='readonly', width=12)
+        Label(r2, text='班组:', bg=CARD, font=('Microsoft YaHei', 9)).pack(side=LEFT)
+        self.cb_group = ttk.Combobox(r2, values=gvals, width=12)
         self.cb_group.pack(side=LEFT, padx=(2, 8))
         self.cb_group.set('(无)')
         # 根据角色显示/隐藏组别
@@ -91,7 +91,7 @@ class UserDialog:
             logger.error(f'获取工人列表失败: {e}')
             self._worker_list = []
             wvals = ['(无)']
-        self.cb_worker = ttk.Combobox(self._worker_frame, values=wvals, state='readonly', width=15)
+        self.cb_worker = ttk.Combobox(self._worker_frame, values=wvals, width=15)
         self.cb_worker.pack(side=LEFT, padx=(2, 4))
         self.cb_worker.set('(无)')
         self._worker_frame.pack(side=LEFT)
@@ -310,8 +310,8 @@ class UserDialog:
         except Exception:
             pass
         gvals = ['(无)'] + group_list
-        Label(f, text='组别:', bg=CARD, font=('Microsoft YaHei', 9)).grid(row=2, column=0, sticky=W, pady=3)
-        cb_g = ttk.Combobox(f, values=gvals, state='readonly', width=18)
+        Label(f, text='班组:', bg=CARD, font=('Microsoft YaHei', 9)).grid(row=2, column=0, sticky=W, pady=3)
+        cb_g = ttk.Combobox(f, values=gvals, width=18)
         cur_group = user.get('group_name', '')
         cb_g.set(cur_group if cur_group else '(无)')
         cb_g.grid(row=2, column=1, pady=3, padx=(4, 0))
@@ -322,7 +322,7 @@ class UserDialog:
         Label(worker_frame, text='关联工人:', bg=CARD, font=('Microsoft YaHei', 9)).pack(side=LEFT)
         all_workers = WorkerRepository.get_all()
         worker_names = ['(无)'] + [w['name'] for w in all_workers]
-        cb_w = ttk.Combobox(worker_frame, values=worker_names, state='readonly', width=18)
+        cb_w = ttk.Combobox(worker_frame, values=worker_names, width=18)
         cur_wid = user.get('worker_id', 0)
         if cur_wid:
             for w in all_workers:

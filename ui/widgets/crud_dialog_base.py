@@ -39,7 +39,7 @@ class CrudDialogBase:
         self.tree = ttk.Treeview(self.top, columns=cols, show='headings', height=10)
         for col in cols:
             self.tree.heading(col, text=headers.get(col, col))
-            self.tree.column(col, width=widths.get(col, 100))
+            self.tree.column(col, width=widths.get(col, 100), anchor='center')
         self.tree.pack(fill='both', expand=True, padx=16)
 
     def _build_form(self, add_fields):

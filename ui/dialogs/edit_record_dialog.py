@@ -7,8 +7,13 @@ from config import CARD, DARK, ACCENT, RED, YEN
 from models.record import RecordRepository
 from models.worker import WorkerRepository
 from models.process import ProcessRepository
-from services.process_service import ProcessService
 from utils.logger import logger
+
+
+def _format_process_display(p: dict) -> str:
+    """格式化工序显示文本：编号(名称)-版本 / 工序名"""
+    ver = f"-{p.get('material_version', '')}" if p.get('material_version') else ''
+    return f"{p['material_code']}({p.get('material_name', '')}){ver} / {p['process_name']}"
 
 
 class EditRecordDialog:
@@ -75,14 +80,17 @@ class EditRecordDialog:
         ff = Frame(self.top, bg=CARD)
         ff.pack(padx=24, fill=X)
 
-        # 记录 ID（只读）
+        # 记录 ID（可编辑）
         row0 = Frame(ff, bg=CARD)
         row0.pack(fill=X, pady=2)
         Label(row0, text='记录 ID：', bg=CARD, font=('Microsoft YaHei', 10),
               width=10, anchor=W).pack(side=LEFT)
-        e_id_lbl = Label(row0, text=str(self.record_id), bg=CARD, fg='#888',
-                         font=('Microsoft YaHei', 10))
-        e_id_lbl.pack(side=LEFT)
+        self.e_id = Entry(row0, width=10, font=('Microsoft YaHei', 11),
+                          relief='solid', bd=1, justify=CENTER)
+        self.e_id.pack(side=LEFT)
+        self.e_id.insert(0, str(self.record_id))
+        Label(row0, text='（修改ID需确保不重复）', bg=CARD, fg='#888',
+              font=('Microsoft YaHei', 8)).pack(side=LEFT, padx=(6, 0))
 
         # 工人下拉
         self.all_workers = WorkerRepository.get_all()
@@ -95,7 +103,7 @@ class EditRecordDialog:
         row1.pack(fill=X, pady=2)
         Label(row1, text='工人：', bg=CARD, font=('Microsoft YaHei', 10),
               width=10, anchor=W).pack(side=LEFT)
-        self.cb_worker = ttk.Combobox(row1, values=worker_names, state='readonly',
+        self.cb_worker = ttk.Combobox(row1, values=worker_names,
                                        width=20, font=('Microsoft YaHei', 10))
         self.cb_worker.pack(side=LEFT)
 
@@ -104,7 +112,7 @@ class EditRecordDialog:
         row2.pack(fill=X, pady=2)
         Label(row2, text='工序：', bg=CARD, font=('Microsoft YaHei', 10),
               width=10, anchor=W).pack(side=LEFT)
-        self.cb_process = ttk.Combobox(row2, values=[], state='readonly',
+        self.cb_process = ttk.Combobox(row2, values=[],
                                         width=28, font=('Microsoft YaHei', 10))
         self.cb_process.pack(side=LEFT)
 
@@ -173,12 +181,8 @@ class EditRecordDialog:
             self.cb_process.set('')
             return
         wid = self.all_workers[w_idx]['id']
-        assigned_pids = set(ProcessService.get_worker_processes(wid))
-        if assigned_pids:
-            filtered = [p for p in self.all_processes if p['id'] in assigned_pids]
-        else:
-            filtered = self.all_processes
-        proc_labels = [f"{p['material']} - {p['process_name']}" for p in filtered]
+        filtered = self.all_processes
+        proc_labels = [_format_process_display(p) for p in filtered]
         self.cb_process['values'] = proc_labels
         # 选中原始工序
         for i, p in enumerate(filtered):
@@ -198,15 +202,24 @@ class EditRecordDialog:
             wid_idx = self.cb_worker.current()
             if wid_idx >= 0 and wid_idx < len(self.all_workers):
                 wid = self.all_workers[wid_idx]['id']
-                assigned_pids = set(ProcessService.get_worker_processes(wid))
-                if assigned_pids:
-                    filtered = [p for p in self.all_processes if p['id'] in assigned_pids]
-                else:
-                    filtered = self.all_processes
+                filtered = self.all_processes
                 if idx < len(filtered):
                     self.price_label.config(text=f"单价: {YEN}{filtered[idx]['unit_price']}")
 
     def _do_save(self):
+        # 获取自定义ID
+        id_s = self.e_id.get().strip()
+        new_id = None
+        if id_s:
+            try:
+                new_id = int(id_s)
+                if new_id < 1:
+                    self.err_label.config(text='ID必须为正整数')
+                    return
+            except ValueError:
+                self.err_label.config(text='ID必须为正整数')
+                return
+
         widx = self.cb_worker.current()
         pidx = self.cb_process.current()
         qty_s = self.e_qty.get().strip()
@@ -234,17 +247,18 @@ class EditRecordDialog:
             return
 
         wid = self.all_workers[widx]['id']
-        assigned_pids2 = set(ProcessService.get_worker_processes(wid))
-        if assigned_pids2:
-            filtered2 = [p for p in self.all_processes if p['id'] in assigned_pids2]
-        else:
-            filtered2 = self.all_processes
+        filtered2 = self.all_processes
         if pidx >= len(filtered2):
             self.err_label.config(text='工序数据错误')
             return
         proc = filtered2[pidx]
 
-        RecordRepository.update(self.record_id, wid, proc['id'], qty, proc['unit_price'], d)
+        try:
+            RecordRepository.update(self.record_id, wid, proc['id'], qty, proc['unit_price'], d, new_id=new_id)
+        except ValueError as ve:
+            self.err_label.config(text=str(ve))
+            return
+
         messagebox.showinfo('成功', '记录已更新')
         self.top.destroy()
         if self.on_save_callback:

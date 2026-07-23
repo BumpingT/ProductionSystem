@@ -5,16 +5,18 @@ from services.permission_service import PermissionService
 
 class RecordRepository:
     @staticmethod
-    def get_all(user: dict = None) -> list[dict]:
+    def get_all(user: dict = None, order_sql: str = '') -> list[dict]:
         conn = Database.get_conn()
         where_clause, params = PermissionService.build_worker_filter_clause(user, 'r')
         where_sql = f' WHERE {where_clause}' if where_clause else ''
+        if not order_sql:
+            order_sql = 'ORDER BY r.id DESC'
         rows = conn.execute(f"""SELECT r.*, w.name AS worker_name, w.group_name,
-                       p.material, p.process_name
+                       p.material_code, p.process_name
                 FROM records r
                 LEFT JOIN workers w ON r.worker_id = w.id
                 LEFT JOIN processes p ON r.process_id = p.id{where_sql}
-                ORDER BY r.id DESC LIMIT 500""", params).fetchall()
+                {order_sql} LIMIT 500""", params).fetchall()
         return [dict(r) for r in rows]
 
     @staticmethod
@@ -31,11 +33,36 @@ class RecordRepository:
             return False
 
     @staticmethod
-    def update(rid: int, worker_id: int, process_id: int, quantity: float, unit_price: float, record_date: str):
+    def add_with_id(record_id: int, worker_id: int, process_id: int,
+                    quantity: float, unit_price: float, record_date: str) -> bool:
+        """添加记录时指定自定义ID"""
         conn = Database.get_conn()
-        conn.execute("""UPDATE records SET
-            worker_id=?, process_id=?, quantity=?, unit_price=?, record_date=?
-            WHERE id=?""", (worker_id, process_id, quantity, unit_price, record_date, rid))
+        try:
+            conn.execute("""INSERT INTO records
+                (id, worker_id, process_id, quantity, unit_price, record_date)
+                VALUES (?,?,?,?,?,?)""", (record_id, worker_id, process_id, quantity, unit_price, record_date))
+            conn.commit()
+            return True
+        except Exception as e:
+            logger.error(f'添加记录失败(自定义ID): {e}')
+            return False
+
+    @staticmethod
+    def update(rid: int, worker_id: int, process_id: int, quantity: float,
+               unit_price: float, record_date: str, new_id: int = None):
+        conn = Database.get_conn()
+        if new_id is not None and new_id != rid:
+            # 检查新ID是否已被占用
+            existing = conn.execute("SELECT id FROM records WHERE id=? AND id!=?", (new_id, rid)).fetchone()
+            if existing:
+                raise ValueError(f'ID {new_id} 已被占用')
+            conn.execute("""UPDATE records SET
+                id=?, worker_id=?, process_id=?, quantity=?, unit_price=?, record_date=?
+                WHERE id=?""", (new_id, worker_id, process_id, quantity, unit_price, record_date, rid))
+        else:
+            conn.execute("""UPDATE records SET
+                worker_id=?, process_id=?, quantity=?, unit_price=?, record_date=?
+                WHERE id=?""", (worker_id, process_id, quantity, unit_price, record_date, rid))
         conn.commit()
 
     @staticmethod
@@ -78,7 +105,7 @@ class RecordRepository:
             SUM(r.quantity) AS q, SUM(r.quantity*r.unit_price) AS e
             FROM records r LEFT JOIN workers w ON r.worker_id=w.id{ws}
             GROUP BY r.worker_id ORDER BY e DESC""", pa).fetchall()
-        by_process = conn.execute(f"""SELECT p.material, p.process_name,
+        by_process = conn.execute(f"""SELECT p.material_code, p.process_name,
             SUM(r.quantity) AS q, SUM(r.quantity*r.unit_price) AS e
             FROM records r LEFT JOIN processes p ON r.process_id=p.id{ws}
             GROUP BY r.process_id ORDER BY q DESC""", pa).fetchall()

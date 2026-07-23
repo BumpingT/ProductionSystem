@@ -77,6 +77,9 @@ class ChangePasswordDialog:
             if not verify_password(opw, user['password_hash']):
                 err2.config(text='旧密码错误')
                 return
+            if verify_password(npw, user['password_hash']):
+                err2.config(text='新密码不能与旧密码相同')
+                return
             UserRepository.update_password(un, npw)
             messagebox.showinfo('成功', '密码修改成功')
             cp.destroy()

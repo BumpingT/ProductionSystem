@@ -24,7 +24,7 @@ def _chart_html(stats, title=''):
         for k in ('record_date',):
             if item.get(k) is None: item[k] = ''
     for item in p:
-        for k in ('material', 'process_name'):
+        for k in ('material_code', 'process_name'):
             if item.get(k) is None: item[k] = ''
 
     # ── 工人工价数据 ──
@@ -53,7 +53,14 @@ def _chart_html(stats, title=''):
 
     # ── 工序产量数据 ──
     p_data = [x['q'] for x in p]
-    p_names = [(x['material'] or '') + '-' + (x['process_name'] or '') for x in p]
+    from models.material import MaterialRepository
+    def _fmt_mat(code):
+        mat = MaterialRepository.get_by_code(code) if code else None
+        if mat:
+            ver = f"-{mat['version']}" if mat['version'] else ''
+            return f"{mat['code']}({mat['name']}){ver}"
+        return code or ''
+    p_names = [_fmt_mat(x['material_code']) + '-' + (x['process_name'] or '') for x in p]
     pj = json.dumps(p_data)
 
     # ── 动态计算最大标签宽度 ──

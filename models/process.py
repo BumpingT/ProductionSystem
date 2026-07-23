@@ -2,70 +2,54 @@
 from .database import Database
 from utils.logger import logger
 
+
 class ProcessRepository:
     @staticmethod
     def get_all() -> list[dict]:
         conn = Database.get_conn()
         rows = conn.execute("""
-            SELECT p.*, m.price AS material_price
+            SELECT p.id, p.material_code, p.process_name, p.unit_price,
+                   m.name AS material_name, m.version AS material_version
             FROM processes p
-            LEFT JOIN materials m ON p.material = m.name
-            ORDER BY p.material, p.process_name
+            LEFT JOIN materials m ON p.material_code = m.code
+            ORDER BY p.material_code, p.process_name
         """).fetchall()
         return [dict(r) for r in rows]
 
     @staticmethod
-    def add(material: str, process_name: str, unit_price: float) -> bool:
-        if not material or not material.strip() or not process_name or not process_name.strip():
-            logger.warning('添加工序失败: 物料和工序名称不能为空')
+    def add(material_code: str, process_name: str, unit_price: float) -> bool:
+        if not material_code or not material_code.strip() or not process_name or not process_name.strip():
+            logger.warning('添加工序失败: 物料编号和工序名称不能为空')
             return False
         conn = Database.get_conn()
         try:
-            conn.execute("INSERT INTO processes (material,process_name,unit_price) VALUES (?,?,?)",
-                        (material, process_name, unit_price))
+            conn.execute("INSERT INTO processes (material_code,process_name,unit_price) VALUES (?,?,?)",
+                        (material_code, process_name, unit_price))
             conn.commit()
-            logger.info(f'添加工序: {material}/{process_name}')
+            logger.info(f'添加工序: {material_code}/{process_name}')
             return True
         except Exception as e:
             logger.warning(f'添加工序失败: {e}')
             return False
 
     @staticmethod
-    def update(pid: int, material: str, process_name: str, unit_price: float):
+    def update(pid: int, material_code: str, process_name: str, unit_price: float):
         conn = Database.get_conn()
-        conn.execute("UPDATE processes SET material=?,process_name=?,unit_price=? WHERE id=?",
-                    (material, process_name, unit_price, pid))
+        conn.execute("UPDATE processes SET material_code=?,process_name=?,unit_price=? WHERE id=?",
+                    (material_code, process_name, unit_price, pid))
         conn.commit()
 
     @staticmethod
     def delete(pid: int):
         conn = Database.get_conn()
+        conn.execute("DELETE FROM records WHERE process_id=?", (pid,))
         conn.execute("DELETE FROM processes WHERE id=?", (pid,))
-        conn.execute("DELETE FROM worker_processes WHERE process_id=?", (pid,))
         conn.commit()
-        logger.info(f'删除工序 ID={pid}')
-
-    # ── 工人工序分配 ──
-    @staticmethod
-    def get_worker_processes(worker_id: int) -> list[int]:
-        conn = Database.get_conn()
-        rows = conn.execute("SELECT process_id FROM worker_processes WHERE worker_id=?",
-                           (worker_id,)).fetchall()
-        return [r['process_id'] for r in rows]
+        logger.info(f'删除工序 ID={pid}，已同步清理关联记录')
 
     @staticmethod
-    def assign_worker_process(worker_id: int, process_id: int):
+    def get_process_names() -> list[str]:
+        """获取所有不重复的工序名称"""
         conn = Database.get_conn()
-        try:
-            conn.execute("INSERT INTO worker_processes (worker_id,process_id) VALUES (?,?)",
-                        (worker_id, process_id))
-            conn.commit()
-        except Exception:
-            pass
-
-    @staticmethod
-    def unassign_worker_process(worker_id: int, process_id: int):
-        conn = Database.get_conn()
-        conn.execute("DELETE FROM worker_processes WHERE worker_id=? AND process_id=?",
-                    (worker_id, process_id))
-        conn.commit()
+        rows = conn.execute("SELECT DISTINCT process_name FROM processes ORDER BY process_name").fetchall()
+        return [r['process_name'] for r in rows]
