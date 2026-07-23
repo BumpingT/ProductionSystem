@@ -1,51 +1,20 @@
 """生产记录数据访问"""
 from .database import Database
 from utils.logger import logger
+from services.permission_service import PermissionService
 
 class RecordRepository:
     @staticmethod
     def get_all(user: dict = None) -> list[dict]:
         conn = Database.get_conn()
-        base_sql = """SELECT r.*, w.name AS worker_name, w.group_name,
+        where_clause, params = PermissionService.build_worker_filter_clause(user, 'r')
+        where_sql = f' WHERE {where_clause}' if where_clause else ''
+        rows = conn.execute(f"""SELECT r.*, w.name AS worker_name, w.group_name,
                        p.material, p.process_name
                 FROM records r
                 LEFT JOIN workers w ON r.worker_id = w.id
-                LEFT JOIN processes p ON r.process_id = p.id"""
-
-        if user and user.get('role') == 'worker':
-            wid = user.get('worker_id')
-            if wid:
-                rows = conn.execute(base_sql + """
-                    WHERE r.worker_id = ?
-                    ORDER BY r.id DESC LIMIT 500
-                """, (wid,)).fetchall()
-            else:
-                rows = []
-        elif user and user.get('role') == 'leader':
-            # 组长：优先使用 leader_workers 精确关联
-            leader_workers = conn.execute(
-                "SELECT worker_id FROM leader_workers WHERE leader_username=?",
-                (user['username'],)).fetchall()
-            lw_ids = [rw['worker_id'] for rw in leader_workers]
-            if lw_ids:
-                placeholders = ','.join(['?'] * len(lw_ids))
-                rows = conn.execute(base_sql + f"""
-                    WHERE r.worker_id IN ({placeholders})
-                    ORDER BY r.id DESC LIMIT 500
-                """, lw_ids).fetchall()
-            elif user.get('group_name'):
-                # 降级：按组别过滤
-                rows = conn.execute(base_sql + """
-                    WHERE w.group_name = ?
-                    ORDER BY r.id DESC LIMIT 500
-                """, (user['group_name'],)).fetchall()
-            else:
-                # 无关联无组别，看不到数据
-                rows = []
-        else:
-            rows = conn.execute(base_sql + """
-                ORDER BY r.id DESC LIMIT 500
-            """).fetchall()
+                LEFT JOIN processes p ON r.process_id = p.id{where_sql}
+                ORDER BY r.id DESC LIMIT 500""", params).fetchall()
         return [dict(r) for r in rows]
 
     @staticmethod
@@ -82,27 +51,11 @@ class RecordRepository:
         conn = Database.get_conn()
         wh = []
         pa = []
-        # 组长只能看本组数据（用子查询避免 JOIN 别名冲突）
-        if user and user.get('role') == 'worker':
-            wid = user.get('worker_id')
-            if wid:
-                wh.append("r.worker_id=?")
-                pa.append(wid)
-            else:
-                # 无关联工人，看不到数据
-                wh.append("1=0")  # 永假条件
-        elif user and user.get('role') == 'leader':
-            # 优先使用 leader_workers 精确关联
-            lw = conn.execute("SELECT worker_id FROM leader_workers WHERE leader_username=?",
-                             (user['username'],)).fetchall()
-            lw_ids = [r['worker_id'] for r in lw]
-            if lw_ids:
-                wh.append("r.worker_id IN (" + ','.join(['?'] * len(lw_ids)) + ")")
-                pa.extend(lw_ids)
-            elif user.get('group_name'):
-                # 降级到按组别过滤
-                wh.append("r.worker_id IN (SELECT id FROM workers WHERE group_name=?)")
-                pa.append(user['group_name'])
+        # 使用 PermissionService 统一处理数据权限过滤
+        perm_where, perm_params = PermissionService.build_worker_filter_clause(user, 'r')
+        if perm_where:
+            wh.append(perm_where)
+            pa.extend(perm_params)
         if start_date:
             wh.append("r.record_date >= ?")
             pa.append(start_date)

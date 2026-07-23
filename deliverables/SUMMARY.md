@@ -65,7 +65,8 @@ production_system/
 │   ├── record.py            #   生产记录 CRUD + 统计
 │   └── user.py              #   用户 + 权限 CRUD
 │
-├── services/                # 业务逻辑层 (4个Service)
+├── services/                # 业务逻辑层 (6个Service)
+│   ├── permission_service.py#   数据权限过滤（新增）
 │   ├── auth_service.py      #   登录验证、权限检查
 │   ├── stats_service.py     #   统计计算
 │   ├── export_service.py    #   Excel 导出
@@ -75,9 +76,12 @@ production_system/
 │   ├── widgets/
 │   │   └── crud_dialog_base.py  # CRUD 对话框基类
 │   └── dialogs/
-│       ├── material_dialog.py   # 物料管理对话框
-│       ├── worker_dialog.py     # 工人管理对话框
-│       └── process_dialog.py    # 工序管理对话框(含工人分配)
+│       ├── edit_record_dialog.py    # 编辑记录对话框（新增）
+│       ├── change_password_dialog.py# 修改密码对话框（新增）
+│       ├── permission_dialog.py     # 权限管理对话框（新增）
+│       ├── material_dialog.py       # 物料管理对话框
+│       ├── worker_dialog.py         # 工人管理对话框
+│       └── process_dialog.py        # 工序管理对话框(含工人分配)
 │
 ├── utils/                   # 工具层
 │   ├── auth.py              #   密码哈希工具
@@ -121,6 +125,9 @@ python build.py
 
 - ✅ **分层架构**：UI 层 → Service 层 → Repository 层 → Database，依赖方向明确
 - ✅ **CRUD 基类复用**：CrudDialogBase 减少 70% 的对话框重复代码
+- ✅ **权限服务抽象**：PermissionService 统一处理数据权限过滤，消除 3 处重复逻辑
+- ✅ **对话框组件化**：EditRecordDialog、ChangePasswordDialog、PermissionDialog 从 DashboardView 中独立
+- ✅ **main.py 精简**：移除 20+ 个全局函数别名，消除分层架构腐蚀
 - ✅ **全局日志**：控制台 + 文件双输出，便于问题排查
 - ✅ **全局异常处理**：未捕获异常自动弹窗提示 + 记录日志
 - ✅ **PBKDF2-SHA256**：业界标准密码哈希，100,000 次迭代

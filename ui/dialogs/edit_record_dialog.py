@@ -1,0 +1,243 @@
+"""
+编辑记录对话框 — 从 DashboardView 拆分为独立组件
+"""
+from tkinter import Toplevel, Label, Frame, Button, Entry, ttk, W, CENTER
+from tkinter import messagebox
+from config import CARD, DARK, ACCENT, RED, YEN
+from models.record import RecordRepository
+from models.worker import WorkerRepository
+from models.process import ProcessRepository
+from services.process_service import ProcessService
+from utils.logger import logger
+
+
+class EditRecordDialog:
+    """编辑单条生产记录"""
+
+    def __init__(self, parent_root, record_id, current_user, on_save_callback=None):
+        """
+        parent_root: 主窗口 root（用于计算居中位置）
+        record_id: 要编辑的记录 ID
+        current_user: 当前用户 dict
+        on_save_callback: 保存成功后的回调
+        """
+        self.root = parent_root
+        self.record_id = record_id
+        self.current_user = current_user
+        self.on_save_callback = on_save_callback
+
+        # 获取记录完整数据
+        records = RecordRepository.get_all(self.current_user)
+        self.record = None
+        for r in records:
+            if r['id'] == record_id:
+                self.record = r
+                break
+
+        if not self.record:
+            messagebox.showerror('错误', '未找到该记录')
+            return
+
+        # 权限验证
+        self._check_permission()
+        self._build()
+
+    def _check_permission(self):
+        """权限验证：普通工人只能编辑自己的记录"""
+        user = self.current_user
+        if not user:
+            return
+        role = user.get('role', '')
+        if role == 'worker':
+            wid = user.get('worker_id')
+            if not wid:
+                messagebox.showinfo('提示', '您未关联工人，不能编辑记录')
+                raise PermissionError('无权限')
+            if self.record['worker_id'] != wid:
+                messagebox.showinfo('提示', '您只能编辑自己的记录')
+                raise PermissionError('无权限')
+
+    def _build(self):
+        self.top = Toplevel(self.root)
+        self.top.title('编辑记录')
+        self.top.geometry('520x350')
+        self.top.configure(bg=CARD)
+        self.top.resizable(False, False)
+        self.top.grab_set()
+        self.top.transient(self.root)
+        xp = self.root.winfo_x() + self.root.winfo_width() // 2 - 260
+        yp = self.root.winfo_y() + self.root.winfo_height() // 2 - 175
+        self.top.geometry(f'+{xp}+{yp}')
+
+        Label(self.top, text='编辑生产记录', font=('Microsoft YaHei', 12, 'bold'),
+              bg=CARD, fg=DARK).pack(pady=(12, 10))
+
+        ff = Frame(self.top, bg=CARD)
+        ff.pack(padx=24, fill=X)
+
+        # 记录 ID（只读）
+        row0 = Frame(ff, bg=CARD)
+        row0.pack(fill=X, pady=2)
+        Label(row0, text='记录 ID：', bg=CARD, font=('Microsoft YaHei', 10),
+              width=10, anchor=W).pack(side=LEFT)
+        e_id_lbl = Label(row0, text=str(self.record_id), bg=CARD, fg='#888',
+                         font=('Microsoft YaHei', 10))
+        e_id_lbl.pack(side=LEFT)
+
+        # 工人下拉
+        self.all_workers = WorkerRepository.get_all()
+        self.all_processes = ProcessRepository.get_all()
+        worker_names = [w['name'] for w in self.all_workers]
+        orig_worker_id = self.record['worker_id']
+        orig_process_id = self.record['process_id']
+
+        row1 = Frame(ff, bg=CARD)
+        row1.pack(fill=X, pady=2)
+        Label(row1, text='工人：', bg=CARD, font=('Microsoft YaHei', 10),
+              width=10, anchor=W).pack(side=LEFT)
+        self.cb_worker = ttk.Combobox(row1, values=worker_names, state='readonly',
+                                       width=20, font=('Microsoft YaHei', 10))
+        self.cb_worker.pack(side=LEFT)
+
+        # 工序下拉
+        row2 = Frame(ff, bg=CARD)
+        row2.pack(fill=X, pady=2)
+        Label(row2, text='工序：', bg=CARD, font=('Microsoft YaHei', 10),
+              width=10, anchor=W).pack(side=LEFT)
+        self.cb_process = ttk.Combobox(row2, values=[], state='readonly',
+                                        width=28, font=('Microsoft YaHei', 10))
+        self.cb_process.pack(side=LEFT)
+
+        self.price_label = Label(row2, text='', bg=CARD, fg=ACCENT,
+                                 font=('Microsoft YaHei', 10, 'bold'))
+        self.price_label.pack(side=LEFT, padx=(6, 0))
+
+        # 件数输入
+        row3 = Frame(ff, bg=CARD)
+        row3.pack(fill=X, pady=2)
+        Label(row3, text='件数：', bg=CARD, font=('Microsoft YaHei', 10),
+              width=10, anchor=W).pack(side=LEFT)
+        self.e_qty = Entry(row3, width=12, font=('Microsoft YaHei', 11),
+                           relief='solid', bd=1, justify=CENTER)
+        self.e_qty.pack(side=LEFT)
+
+        # 日期输入
+        row4 = Frame(ff, bg=CARD)
+        row4.pack(fill=X, pady=2)
+        Label(row4, text='日期：', bg=CARD, font=('Microsoft YaHei', 10),
+              width=10, anchor=W).pack(side=LEFT)
+        self.e_date = Entry(row4, width=14, font=('Microsoft YaHei', 11),
+                            relief='solid', bd=1, justify=CENTER)
+        self.e_date.pack(side=LEFT)
+
+        # 查找原始工人和工序的索引
+        self.orig_worker_idx = 0
+        for i, w in enumerate(self.all_workers):
+            if w['id'] == orig_worker_id:
+                self.orig_worker_idx = i
+                break
+        self.orig_process_id = orig_process_id
+
+        # 绑定事件
+        self.cb_worker.bind('<<ComboboxSelected>>', self._on_worker_sel)
+        self.cb_process.bind('<<ComboboxSelected>>', self._on_process_sel)
+
+        # 预填值
+        self.cb_worker.current(self.orig_worker_idx)
+        self._update_process_list(self.orig_worker_idx)
+        self.e_qty.insert(0, str(self.record['quantity']))
+        self.e_date.insert(0, self.record['record_date'])
+
+        # 错误提示
+        self.err_label = Label(self.top, text='', bg=CARD, fg=RED,
+                               font=('Microsoft YaHei', 9))
+        self.err_label.pack(pady=(4, 0))
+
+        # 按钮区
+        btn_frame = Frame(self.top, bg=CARD)
+        btn_frame.pack(pady=(8, 0))
+        Button(btn_frame, text='保存修改', bg=ACCENT, fg='white',
+               font=('Microsoft YaHei', 10, 'bold'), relief='flat',
+               padx=16, pady=3, cursor='hand2',
+               command=self._do_save).pack(side=LEFT, padx=(0, 10))
+        Button(btn_frame, text='取消', bg='#999', fg='white',
+               font=('Microsoft YaHei', 10, 'bold'), relief='flat',
+               padx=16, pady=3, cursor='hand2',
+               command=self.top.destroy).pack(side=LEFT)
+
+    def _update_process_list(self, w_idx):
+        """根据选中的工人过滤工序列表"""
+        if w_idx < 0 or w_idx >= len(self.all_workers):
+            self.cb_process['values'] = []
+            self.cb_process.set('')
+            return
+        wid = self.all_workers[w_idx]['id']
+        assigned_pids = set(ProcessService.get_worker_processes(wid))
+        if assigned_pids:
+            filtered = [p for p in self.all_processes if p['id'] in assigned_pids]
+        else:
+            filtered = self.all_processes
+        proc_labels = [f"{p['material']} - {p['process_name']}" for p in filtered]
+        self.cb_process['values'] = proc_labels
+        # 选中原始工序
+        for i, p in enumerate(filtered):
+            if p['id'] == self.orig_process_id:
+                self.cb_process.current(i)
+                self.price_label.config(text=f"单价: {YEN}{p['unit_price']}")
+                break
+
+    def _on_worker_sel(self, ev=None):
+        idx = self.cb_worker.current()
+        if idx >= 0:
+            self._update_process_list(idx)
+
+    def _on_process_sel(self, ev=None):
+        idx = self.cb_process.current()
+        if idx >= 0:
+            wid_idx = self.cb_worker.current()
+            if wid_idx >= 0 and wid_idx < len(self.all_workers):
+                wid = self.all_workers[wid_idx]['id']
+                assigned_pids = set(ProcessService.get_worker_processes(wid))
+                if assigned_pids:
+                    filtered = [p for p in self.all_processes if p['id'] in assigned_pids]
+                else:
+                    filtered = self.all_processes
+                if idx < len(filtered):
+                    self.price_label.config(text=f"单价: {YEN}{filtered[idx]['unit_price']}")
+
+    def _do_save(self):
+        widx = self.cb_worker.current()
+        pidx = self.cb_process.current()
+        qty_s = self.e_qty.get().strip()
+        d = self.e_date.get().strip()
+        if widx < 0 or pidx < 0:
+            self.err_label.config(text='请选择工人和工序')
+            return
+        if not qty_s:
+            self.err_label.config(text='请填写件数')
+            return
+        try:
+            qty = float(qty_s)
+        except ValueError:
+            self.err_label.config(text='件数必须为数字')
+            return
+        if not d:
+            self.err_label.config(text='请填写日期')
+            return
+
+        wid = self.all_workers[widx]['id']
+        assigned_pids2 = set(ProcessService.get_worker_processes(wid))
+        if assigned_pids2:
+            filtered2 = [p for p in self.all_processes if p['id'] in assigned_pids2]
+        else:
+            filtered2 = self.all_processes
+        if pidx >= len(filtered2):
+            self.err_label.config(text='工序数据错误')
+            return
+        proc = filtered2[pidx]
+
+        RecordRepository.update(self.record_id, wid, proc['id'], qty, proc['unit_price'], d)
+        messagebox.showinfo('成功', '记录已更新')
+        self.top.destroy()
+        if self.on_save_callback:
+            self.on_save_callback()

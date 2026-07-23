@@ -120,6 +120,11 @@ class Database:
             )""")
         except Exception:
             pass
+        # 兼容：确保 admin 拥有 ALL_PERMS 中所有权限
+        from config import ALL_PERMS
+        for pk in ALL_PERMS:
+            c.execute("INSERT OR IGNORE INTO user_permissions (username,perm_key,allowed) VALUES (?,?,1)",
+                      ('admin', pk))
 
         conn.commit()
         logger.info('数据库初始化完成')

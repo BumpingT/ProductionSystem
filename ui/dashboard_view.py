@@ -11,16 +11,17 @@ from services.chart_service import gen_report
 from services.export_service import export_excel
 from services.process_service import ProcessService
 from ui.dialogs.user_dialog import UserDialog
+from ui.dialogs.edit_record_dialog import EditRecordDialog
+from ui.dialogs.change_password_dialog import ChangePasswordDialog
+from ui.dialogs.permission_dialog import PermissionDialog
 from models.record import RecordRepository
 from models.database import Database
 from models.worker import WorkerRepository
 from models.process import ProcessRepository
-from models.record import RecordRepository as StatsRepo
 from models.user import UserRepository
 from ui.dialogs.material_dialog import MaterialDialog
 from ui.dialogs.worker_dialog import WorkerDialog
 from ui.dialogs.process_dialog import ProcessDialog
-from utils.auth import hash_password as _hash_pw, verify_password as _verify_pw
 from utils.logger import logger
 
 
@@ -346,7 +347,7 @@ class DashboardView:
         self.refresh()
 
     def _edit_record(self, ev=None):
-        """双击表格行编辑记录"""
+        """双击表格行编辑记录 — 委托给 EditRecordDialog"""
         if not self._check_perm('record_edit'):
             messagebox.showinfo('提示', '您没有编辑记录的权限')
             return
@@ -357,244 +358,15 @@ class DashboardView:
         vals = self._tree.item(item, 'values')
         if not vals:
             return
-        record_id = int(vals[0])
-
-        # ── 业务限制：编辑权限 ──
-        from datetime import date
-        from models.record import RecordRepository as RR2
-        user = self.current_user
-        if user:
-            role = user.get('role', '')
-            # 普通工人只能编辑自己的记录
-            if role == 'worker':
-                wid = user.get('worker_id')
-                if not wid:
-                    messagebox.showinfo('提示', '您未关联工人，不能编辑记录')
-                    return
-                # 获取记录主人
-                recs = RR2.get_all(user)
-                rec = None
-                for r in recs:
-                    if r['id'] == record_id:
-                        rec = r
-                        break
-                if rec and rec['worker_id'] != wid:
-                    messagebox.showinfo('提示', '您只能编辑自己的记录')
-                    return
-            # 组长只能编辑本组记录
-            if role == 'leader' and user.get('group_name'):
-                recs = RR2.get_all(user)
-                rec = None
-                for r in recs:
-                    if r['id'] == record_id:
-                        rec = r
-                        break
-                if not rec:
-                    messagebox.showinfo('提示', '您只能编辑本组工人的记录')
-                    return
-
-        # 从数据库重新获取完整记录
-        records = RecordRepository.get_all(self.current_user)
-        record = None
-        for r in records:
-            if r['id'] == record_id:
-                record = r
-                break
-        if not record:
-            messagebox.showerror('错误', '未找到该记录')
-            return
-
-        # 创建编辑对话框
-        from tkinter import Toplevel
-        top = Toplevel(self.root)
-        top.title('编辑记录')
-        top.geometry('520x350')
-        top.configure(bg=CARD)
-        top.resizable(False, False)
-        top.grab_set()
-        top.transient(self.root)
-        xp = self.root.winfo_x() + self.root.winfo_width() // 2 - 260
-        yp = self.root.winfo_y() + self.root.winfo_height() // 2 - 175
-        top.geometry(f'+{xp}+{yp}')
-
-        Label(top, text='编辑生产记录', font=('Microsoft YaHei', 12, 'bold'),
-              bg=CARD, fg=DARK).pack(pady=(12, 10))
-
-        # 表单容器
-        ff = Frame(top, bg=CARD)
-        ff.pack(padx=24, fill=X)
-
-        # 记录 ID（只读）
-        row0 = Frame(ff, bg=CARD)
-        row0.pack(fill=X, pady=2)
-        Label(row0, text='记录 ID：', bg=CARD, font=('Microsoft YaHei', 10),
-              width=10, anchor=W).pack(side=LEFT)
-        e_id_lbl = Label(row0, text=str(record_id), bg=CARD, fg='#888',
-                         font=('Microsoft YaHei', 10))
-        e_id_lbl.pack(side=LEFT)
-
-        # 工人下拉
-        row1 = Frame(ff, bg=CARD)
-        row1.pack(fill=X, pady=2)
-        Label(row1, text='工人：', bg=CARD, font=('Microsoft YaHei', 10),
-              width=10, anchor=W).pack(side=LEFT)
-        all_workers = WorkerRepository.get_all()
-        worker_names = [w['name'] for w in all_workers]
-        cb_worker = ttk.Combobox(row1, values=worker_names, state='readonly',
-                                 width=20, font=('Microsoft YaHei', 10))
-        cb_worker.pack(side=LEFT)
-
-        # 工序下拉
-        row2 = Frame(ff, bg=CARD)
-        row2.pack(fill=X, pady=2)
-        Label(row2, text='工序：', bg=CARD, font=('Microsoft YaHei', 10),
-              width=10, anchor=W).pack(side=LEFT)
-        cb_process = ttk.Combobox(row2, values=[], state='readonly',
-                                  width=28, font=('Microsoft YaHei', 10))
-        cb_process.pack(side=LEFT)
-
-        # 单价标签
-        price_label = Label(row2, text='', bg=CARD, fg=ACCENT,
-                            font=('Microsoft YaHei', 10, 'bold'))
-        price_label.pack(side=LEFT, padx=(6, 0))
-
-        # 件数输入
-        row3 = Frame(ff, bg=CARD)
-        row3.pack(fill=X, pady=2)
-        Label(row3, text='件数：', bg=CARD, font=('Microsoft YaHei', 10),
-              width=10, anchor=W).pack(side=LEFT)
-        e_qty = Entry(row3, width=12, font=('Microsoft YaHei', 11),
-                      relief='solid', bd=1, justify=CENTER)
-        e_qty.pack(side=LEFT)
-
-        # 日期输入
-        row4 = Frame(ff, bg=CARD)
-        row4.pack(fill=X, pady=2)
-        Label(row4, text='日期：', bg=CARD, font=('Microsoft YaHei', 10),
-              width=10, anchor=W).pack(side=LEFT)
-        e_date = Entry(row4, width=14, font=('Microsoft YaHei', 11),
-                       relief='solid', bd=1, justify=CENTER)
-        e_date.pack(side=LEFT)
-        e_date.bind('<Button-1>', lambda e: self._show_calendar(e_date))
-
-        # 查找原始工人和工序的索引
-        orig_worker_id = record['worker_id']
-        orig_process_id = record['process_id']
-        orig_worker_idx = 0
-        for i, w in enumerate(all_workers):
-            if w['id'] == orig_worker_id:
-                orig_worker_idx = i
-                break
-
-        # 所有工序列表（用于过滤）
-        all_processes = ProcessRepository.get_all()
-
-        def _update_process_list(w_idx):
-            """根据选中的工人过滤工序列表"""
-            if w_idx < 0 or w_idx >= len(all_workers):
-                cb_process['values'] = []
-                cb_process.set('')
-                return
-            wid = all_workers[w_idx]['id']
-            # 获取该工人可用的工序
-            assigned_pids = set(ProcessService.get_worker_processes(wid))
-            if assigned_pids:
-                filtered = [p for p in all_processes if p['id'] in assigned_pids]
-            else:
-                filtered = all_processes  # 无分配则显示全部
-            proc_labels = [f"{p['material']} - {p['process_name']}" for p in filtered]
-            cb_process['values'] = proc_labels
-            # 选中原始工序
-            for i, p in enumerate(filtered):
-                if p['id'] == orig_process_id:
-                    cb_process.current(i)
-                    price_label.config(text=f"单价: {YEN}{p['unit_price']}")
-                    break
-            return filtered
-
-        def _on_worker_sel(ev=None):
-            idx = cb_worker.current()
-            if idx >= 0:
-                _update_process_list(idx)
-
-        def _on_process_sel(ev=None):
-            idx = cb_process.current()
-            if idx >= 0:
-                vals2 = cb_process['values']
-                wid_idx = cb_worker.current()
-                if wid_idx >= 0 and wid_idx < len(all_workers):
-                    wid = all_workers[wid_idx]['id']
-                    assigned_pids = set(ProcessService.get_worker_processes(wid))
-                    if assigned_pids:
-                        filtered = [p for p in all_processes if p['id'] in assigned_pids]
-                    else:
-                        filtered = all_processes
-                    if idx < len(filtered):
-                        price_label.config(text=f"单价: {YEN}{filtered[idx]['unit_price']}")
-
-        cb_worker.bind('<<ComboboxSelected>>', _on_worker_sel)
-        cb_process.bind('<<ComboboxSelected>>', _on_process_sel)
-
-        # 预填值
-        cb_worker.current(orig_worker_idx)
-        _update_process_list(orig_worker_idx)
-        e_qty.insert(0, str(record['quantity']))
-        e_date.insert(0, record['record_date'])
-
-        # 错误提示
-        err_label = Label(top, text='', bg=CARD, fg=RED, font=('Microsoft YaHei', 9))
-        err_label.pack(pady=(4, 0))
-
-        def do_save():
-            """保存编辑"""
-            widx = cb_worker.current()
-            pidx = cb_process.current()
-            qty_s = e_qty.get().strip()
-            d = e_date.get().strip()
-            if widx < 0 or pidx < 0:
-                err_label.config(text='请选择工人和工序')
-                return
-            if not qty_s:
-                err_label.config(text='请填写件数')
-                return
-            try:
-                qty = float(qty_s)
-            except ValueError:
-                err_label.config(text='件数必须为数字')
-                return
-            if not d:
-                err_label.config(text='请填写日期')
-                return
-
-            # 获取选中的工序ID和单价
-            wid = all_workers[widx]['id']
-            assigned_pids2 = set(ProcessService.get_worker_processes(wid))
-            if assigned_pids2:
-                filtered2 = [p for p in all_processes if p['id'] in assigned_pids2]
-            else:
-                filtered2 = all_processes
-            if pidx >= len(filtered2):
-                err_label.config(text='工序数据错误')
-                return
-            proc = filtered2[pidx]
-
-            # 更新数据库
-            RecordRepository.update(record_id, wid, proc['id'], qty, proc['unit_price'], d)
-            messagebox.showinfo('成功', '记录已更新')
-            top.destroy()
-            self.refresh()
-
-        # 按钮区
-        btn_frame = Frame(top, bg=CARD)
-        btn_frame.pack(pady=(8, 0))
-        Button(btn_frame, text='保存修改', bg=ACCENT, fg='white',
-               font=('Microsoft YaHei', 10, 'bold'), relief='flat',
-               padx=16, pady=3, cursor='hand2',
-               command=do_save).pack(side=LEFT, padx=(0, 10))
-        Button(btn_frame, text='取消', bg='#999', fg='white',
-               font=('Microsoft YaHei', 10, 'bold'), relief='flat',
-               padx=16, pady=3, cursor='hand2',
-               command=top.destroy).pack(side=LEFT)
+        try:
+            EditRecordDialog(
+                parent_root=self.root,
+                record_id=int(vals[0]),
+                current_user=self.current_user,
+                on_save_callback=self.refresh
+            )
+        except PermissionError:
+            pass
 
     # ── Refresh ──
     def refresh(self):
@@ -700,24 +472,12 @@ class DashboardView:
             conn = Database.get_conn()
             wh = []
             pa = []
-            # 用户权限过滤（组长按组，工人按自己）
-            if self.current_user:
-                if self.current_user.get('role') == 'worker':
-                    wid = self.current_user.get('worker_id')
-                    if wid:
-                        wh.append("r.worker_id=?")
-                        pa.append(wid)
-                    else:
-                        wh.append("1=0")
-                elif self.current_user.get('role') == 'leader':
-                    from models.user import UserRepository as U3
-                    lw_ids = U3.get_leader_workers(self.current_user['username'])
-                    if lw_ids:
-                        wh.append("r.worker_id IN (" + ','.join(['?'] * len(lw_ids)) + ")")
-                        pa.extend(lw_ids)
-                    elif self.current_user.get('group_name'):
-                        wh.append("r.worker_id IN (SELECT id FROM workers WHERE group_name=?)")
-                        pa.append(self.current_user['group_name'])
+            # 使用 PermissionService 统一处理数据权限过滤
+            from services.permission_service import PermissionService
+            perm_where, perm_params = PermissionService.build_worker_filter_clause(self.current_user, 'r')
+            if perm_where:
+                wh.append(perm_where)
+                pa.extend(perm_params)
             # 筛选条件
             if sd:
                 wh.append("r.record_date >= ?")
@@ -905,84 +665,8 @@ class DashboardView:
         self._show_permission_dialog()
 
     def _show_permission_dialog(self):
-        from tkinter import Toplevel, Label, Frame, Canvas, Scrollbar, Checkbutton, IntVar, VERTICAL, HORIZONTAL, BOTTOM
-        from config import ROLE_NAMES
-        top = Toplevel(self.root)
-        top.title('权限管理')
-        top.geometry('1000x500')
-        top.configure(bg=CARD)
-        top.grab_set()
-        Label(top, text='权限管理', font=('Microsoft YaHei', 12, 'bold'),
-              bg=CARD, fg=DARK).pack(anchor=W, padx=16, pady=(10, 4))
-        Label(top, text='点击复选框切换权限', font=('Microsoft YaHei', 9),
-              bg=CARD, fg='#888').pack(anchor=W, padx=16)
-
-        canvas = Canvas(top, bg=CARD, highlightthickness=0)
-        vsb = Scrollbar(top, orient=VERTICAL, command=canvas.yview)
-        hsb = Scrollbar(top, orient=HORIZONTAL, command=canvas.xview)
-        canvas.configure(yscrollcommand=vsb.set, xscrollcommand=hsb.set)
-        vsb.pack(side=RIGHT, fill=Y)
-        hsb.pack(side=BOTTOM, fill=X)
-        canvas.pack(side=LEFT, fill=BOTH, expand=True)
-
-        frame = Frame(canvas, bg=CARD)
-        canvas.create_window((0, 0), window=frame, anchor='nw')
-        frame.bind('<Configure>', lambda e: canvas.configure(scrollregion=canvas.bbox('all')))
-
-        # 获取用户和权限数据
-        try:
-            users = UserRepository.get_all()
-            logger.info(f'权限管理: 加载了 {len(users)} 个用户')
-        except Exception as e:
-            logger.error(f'加载用户列表失败: {e}')
-            Label(top, text=f'加载数据失败: {e}', bg=CARD, fg='red',
-                  font=('Microsoft YaHei', 10)).pack(pady=20)
-            return
-
-        if not users:
-            logger.warning('权限管理: 没有用户可显示')
-            Label(top, text='暂无用户数据，请先添加用户', bg=CARD, fg='#888',
-                  font=('Microsoft YaHei', 10)).pack(pady=20)
-            return
-
-        perm_labels = [
-            ('record_add', '添加记录'), ('record_delete', '删除记录'),
-            ('record_edit', '编辑记录'), ('material_manage', '管理物料'),
-            ('worker_manage', '管理工人'), ('process_manage', '管理工序'),
-            ('assignment_manage', '工序分配'), ('chart_view', '查看图表'),
-            ('summary_view', '查看汇总'), ('monthly_view', '月度汇总'),
-            ('export_excel', '导出Excel'), ('user_manage', '用户管理'),
-        ]
-        perms = [p[0] for p in perm_labels]
-
-        Label(frame, text='用户', bg=CARD, fg=DARK, font=('Microsoft YaHei', 9, 'bold'),
-              width=10, anchor='w').grid(row=0, column=0, padx=4, pady=2, sticky='w')
-        Label(frame, text='角色', bg=CARD, fg=DARK, font=('Microsoft YaHei', 9, 'bold'),
-              width=8, anchor='w').grid(row=0, column=1, padx=4, pady=2, sticky='w')
-        for ci, (pk, pl) in enumerate(perm_labels, 2):
-            Label(frame, text=pl, bg=CARD, fg='#555', font=('Microsoft YaHei', 8),
-                  width=7, anchor='w').grid(row=0, column=ci, padx=2, pady=2)
-
-        self._perm_vars = {}
-        for ri, u in enumerate(users, 1):
-            un = u['username']
-            try:
-                Label(frame, text=un, bg=CARD, fg=DARK, font=('Microsoft YaHei', 9),
-                      width=10, anchor='w').grid(row=ri, column=0, padx=4, pady=1, sticky='w')
-                role_cn = ROLE_NAMES.get(u.get('role', ''), u.get('role', ''))
-                Label(frame, text=role_cn, bg=CARD, fg='#555', font=('Microsoft YaHei', 9),
-                      width=8, anchor='w').grid(row=ri, column=1, padx=4, pady=1, sticky='w')
-                perms_dict = UserRepository.get_permissions(un)
-                for ci, pk in enumerate(perms, 2):
-                    var = IntVar(value=perms_dict.get(pk, 0))
-                    self._perm_vars[(un, pk)] = var
-                    def make_cmd(u_name, p_key):
-                        return lambda: UserRepository.set_permission(
-                            u_name, p_key, self._perm_vars[(u_name, p_key)].get())
-                    cb = Checkbutton(frame, variable=var, bg=CARD, command=make_cmd(un, pk))
-                    cb.grid(row=ri, column=ci)
-            except Exception as e:
-                logger.error(f'加载用户 {un} 的权限失败: {e}')
+        """权限管理 — 委托给 PermissionDialog"""
+        PermissionDialog(self.root)
 
     # ── Calendar ──
     def _show_calendar(self, entry, parent=None):
@@ -1069,75 +753,10 @@ class DashboardView:
             self._on_logout()
 
     def _change_pw(self):
-        un = self.current_user['username'] if self.current_user else ''
-        if not un:
+        """修改密码 — 委托给 ChangePasswordDialog"""
+        if not self.current_user:
             return
-        from tkinter import Toplevel
-        cp = Toplevel(self.root)
-        cp.title('修改密码')
-        cp.geometry('320x230')
-        cp.configure(bg=CARD)
-        cp.resizable(False, False)
-        cp.grab_set()
-        cp.transient(self.root)
-        xp = self.root.winfo_x() + self.root.winfo_width() // 2 - 160
-        yp = self.root.winfo_y() + self.root.winfo_height() // 2 - 115
-        cp.geometry(f'+{xp}+{yp}')
-
-        Label(cp, text='修改密码', font=('Microsoft YaHei', 12, 'bold'),
-              bg=CARD, fg=DARK).pack(pady=(12, 10))
-        ff = Frame(cp, bg=CARD)
-        ff.pack(padx=24)
-        Label(ff, text='用户名：', bg=CARD, font=('Microsoft YaHei', 10)).grid(
-            row=0, column=0, sticky=W, pady=3)
-        eu = Entry(ff, width=20, font=('Microsoft YaHei', 10), relief='solid', bd=1)
-        eu.insert(0, un)
-        eu.config(state='readonly')
-        eu.grid(row=0, column=1, pady=3)
-        Label(ff, text='旧密码：', bg=CARD, font=('Microsoft YaHei', 10)).grid(
-            row=1, column=0, sticky=W, pady=3)
-        eo = Entry(ff, width=20, font=('Microsoft YaHei', 10), relief='solid', bd=1, show='*')
-        eo.grid(row=1, column=1, pady=3)
-        Label(ff, text='新密码：', bg=CARD, font=('Microsoft YaHei', 10)).grid(
-            row=2, column=0, sticky=W, pady=3)
-        en = Entry(ff, width=20, font=('Microsoft YaHei', 10), relief='solid', bd=1, show='*')
-        en.grid(row=2, column=1, pady=3)
-        Label(ff, text='确认密码：', bg=CARD, font=('Microsoft YaHei', 10)).grid(
-            row=3, column=0, sticky=W, pady=3)
-        ec = Entry(ff, width=20, font=('Microsoft YaHei', 10), relief='solid', bd=1, show='*')
-        ec.grid(row=3, column=1, pady=3)
-        err2 = Label(cp, text='', bg=CARD, fg=RED, font=('Microsoft YaHei', 9))
-        err2.pack(pady=(4, 0))
-
-        def do_change():
-            opw = eo.get().strip()
-            npw = en.get().strip()
-            cpw = ec.get().strip()
-            if not opw or not npw:
-                err2.config(text='请填写完整')
-                return
-            if npw != cpw:
-                err2.config(text='两次新密码不一致')
-                return
-            if len(npw) < 4:
-                err2.config(text='新密码至少4位')
-                return
-            user = UserRepository.get_by_username(un)
-            if not user:
-                err2.config(text='用户不存在')
-                return
-            if not _verify_pw(opw, user['password_hash']):
-                err2.config(text='旧密码错误')
-                return
-            UserRepository.update_password(un, npw)
-            messagebox.showinfo('成功', '密码修改成功')
-            cp.destroy()
-
-        Button(cp, text='确认修改', bg=ACCENT, fg='white',
-               font=('Microsoft YaHei', 10, 'bold'), relief='flat',
-               padx=20, pady=2, cursor='hand2',
-               command=do_change).pack(pady=(6, 0))
-        eo.focus()
+        ChangePasswordDialog(self.root, self.current_user)
 
     # ── Summary page ──
     def _summary_page(self):
