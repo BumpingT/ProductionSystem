@@ -1,0 +1,23 @@
+<!DOCTYPE html><html><head><meta charset="utf-8"><script src="echarts.min.js"></script>
+<style>*{margin:0;padding:0;box-sizing:border-box}body{font-family:Microsoft YaHei,sans-serif;background:#f0f2f5;padding:20px}
+.sr{display:flex;gap:12px;margin-bottom:16px}
+.sc{flex:1;background:#fff;border-radius:8px;padding:14px;text-align:center;box-shadow:0 1px 3px rgba(0,0,0,.06)}
+.l{font-size:12px;color:#888} .v{font-size:20px;font-weight:700;color:#2c3e50;margin-top:4px}
+.o{font-size:11px;color:#27ae60} .cc{background:#fff;border-radius:8px;padding:14px;margin-bottom:14px;box-shadow:0 1px 3px rgba(0,0,0,.06)}
+.cb{width:100%;min-height:260px} table{width:100%;border-collapse:collapse;font-size:12px}
+th{background:#f7f8fa;padding:6px 8px;text-align:left;border-bottom:2px solid #e8e8e8}
+td{padding:5px 8px;border-bottom:1px solid #f0f0f0} h3{font-size:13px;color:#555;margin-bottom:8px}
+</style></head><body>
+<h2 style="margin-bottom:12px">生产记录统计报表</h2>
+<div class="sr"><div class="sc"><div class="l">工人数</div><div class="v">7</div></div>
+<div class="sc"><div class="l">总产量</div><div class="v">807.0</div></div>
+<div class="sc"><div class="l">总工价</div><div class="v">¥1507.9</div></div>
+<div class="sc"><div class="l">记录数</div><div class="v">18</div></div></div>
+<div class="cc"><h3>工人工价排行</h3><div id="w" class="cb"></div></div>
+<div class="cc"><h3>日产量趋势</h3><div id="d" class="cb"></div></div>
+<div class="cc"><h3>工序产量分布</h3><div id="p" class="cb"></div></div>
+<script>
+var wc=echarts.init(document.getElementById("w"));wc.setOption({title:{show:false},tooltip:{trigger:"axis",axisPointer:{type:"shadow"}},grid:{left:100,right:20,top:20,bottom:20},xAxis:{type:"value",name:"工价(¥)",nameLocation:"middle",nameGap:25,nameTextStyle:{fontSize:11}},yAxis:{type:"category",data:["\u5f20\u4e09", "\u738b\u4e94", "\u674e\u56db", "\u8d75\u516d", "\u5b59\u4e03", "\u738b", "\u5434\u4e5d"],axisLabel:{fontSize:11,width:80,overflow:'truncate'}},series:[{type:"bar",data:[330.0, 177.0, 125.0, 48.0, 83.0, 12.0, 32.0],itemStyle:{color:"#1a73e8",borderRadius:[0,4,4,0]}}]});
+var dc=echarts.init(document.getElementById("d"));dc.setOption({title:{show:false},tooltip:{trigger:"axis"},grid:{left:50,right:20,top:20,bottom:40},xAxis:{type:"category",data:["2026-07-20", "2026-07-21", "2026-07-22", "2026-07-23", "2026-07-24", "2026-08-16"],axisLabel:{rotate:0,fontSize:10,interval:0},axisLine:{onZero:false}},yAxis:{type:"value",name:"产量",nameLocation:"middle",nameGap:35,nameTextStyle:{fontSize:11}},series:[{type:"line",data:[125.0, 135.0, 179.0, 168.0, 100.0, 100.0],smooth:true,lineStyle:{color:"#27ae60"},areaStyle:{color:"#27ae60",opacity:.15}}]});
+var pc=echarts.init(document.getElementById("p"));pc.setOption({title:{show:false},tooltip:{trigger:"axis",axisPointer:{type:"shadow"}},grid:{left:129,right:20,top:20,bottom:20},xAxis:{type:"value",name:"产量",nameLocation:"middle",nameGap:25,nameTextStyle:{fontSize:11}},yAxis:{type:"category",data:["A-1001-\u5207\u5272", "A-1001-\u6253\u78e8", "B-2001-\u5207\u5272", "B-2001-\u4e0a\u8272", "B-2001-\u5305\u88c5", "C-3001-\u6253\u78e8", "C-3001-\u7ec4\u88c5", "A-1001-\u7ec4\u88c5", "D-4001-\u6253\u78e8", "AK47-\u6362\u5f39"],axisLabel:{fontSize:10,width:109,overflow:'truncate'}},series:[{type:"bar",data:[262.0, 220.0, 83.0, 70.0, 45.0, 38.0, 32.0, 25.0, 20.0, 12.0],itemStyle:{color:"#e67e22",borderRadius:[0,4,4,0]}}]});
+</script></body></html>

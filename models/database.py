@@ -87,6 +87,12 @@ class Database:
             key TEXT PRIMARY KEY,
             value TEXT
         )""")
+        c.execute("""CREATE TABLE IF NOT EXISTS leader_workers (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            leader_username TEXT NOT NULL,
+            worker_id INTEGER NOT NULL,
+            UNIQUE(leader_username, worker_id)
+        )""")
 
         # 种子数据
         seeded = c.execute("SELECT value FROM settings WHERE key=?", ("seeded",)).fetchone()
@@ -104,6 +110,16 @@ class Database:
             c.execute("ALTER TABLE users ADD COLUMN group_name TEXT NOT NULL DEFAULT ''")
         except Exception:
             pass  # 列已存在，忽略
+        # 兼容旧数据库：创建 leader_workers 表（如果不存在）
+        try:
+            c.execute("""CREATE TABLE IF NOT EXISTS leader_workers (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                leader_username TEXT NOT NULL,
+                worker_id INTEGER NOT NULL,
+                UNIQUE(leader_username, worker_id)
+            )""")
+        except Exception:
+            pass
 
         conn.commit()
         logger.info('数据库初始化完成')

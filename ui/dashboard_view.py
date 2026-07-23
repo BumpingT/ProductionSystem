@@ -599,12 +599,18 @@ class DashboardView:
 
     # ── Refresh ──
     def refresh(self):
-        # 组长只能看到本组工人
-        is_leader = self.current_user and self.current_user.get('role') == 'leader' and self.current_user.get('group_name')
-        leader_group = self.current_user.get('group_name', '') if is_leader else None
-
-        if leader_group:
-            all_workers = [w for w in WorkerRepository.get_all() if w.get('group_name') == leader_group]
+        # 组长：使用 leader_workers 精确关联的工人
+        from models.user import UserRepository as UR2
+        is_leader = self.current_user and self.current_user.get('role') == 'leader'
+        leader_wids = []
+        if is_leader:
+            leader_wids = UR2.get_leader_workers(self.current_user['username'])
+        if leader_wids:
+            all_workers = [w for w in WorkerRepository.get_all() if w['id'] in leader_wids]
+        elif is_leader and self.current_user.get('group_name'):
+            # 降级：按组别筛选
+            lg = self.current_user.get('group_name', '')
+            all_workers = [w for w in WorkerRepository.get_all() if w.get('group_name') == lg]
         else:
             all_workers = WorkerRepository.get_all()
 
@@ -682,6 +688,10 @@ class DashboardView:
             pf = self._filter_process.get() if hasattr(self, '_filter_process') else '(全部)'
 
             # 查询记录
+            if sd and ed and sd > ed:
+                messagebox.showinfo('提示', '起始日期不能晚于结束日期')
+                self._refresh_table()
+                return
             self._tree.delete(*self._tree.get_children())
             conn = Database.get_conn()
             wh = []
@@ -691,9 +701,15 @@ class DashboardView:
                 if self.current_user.get('role') == 'worker' and self.current_user.get('worker_id'):
                     wh.append("r.worker_id=?")
                     pa.append(self.current_user['worker_id'])
-                elif self.current_user.get('role') == 'leader' and self.current_user.get('group_name'):
-                    wh.append("r.worker_id IN (SELECT id FROM workers WHERE group_name=?)")
-                    pa.append(self.current_user['group_name'])
+                elif self.current_user.get('role') == 'leader':
+                    from models.user import UserRepository as U3
+                    lw_ids = U3.get_leader_workers(self.current_user['username'])
+                    if lw_ids:
+                        wh.append("r.worker_id IN (" + ','.join(['?'] * len(lw_ids)) + ")")
+                        pa.extend(lw_ids)
+                    elif self.current_user.get('group_name'):
+                        wh.append("r.worker_id IN (SELECT id FROM workers WHERE group_name=?)")
+                        pa.append(self.current_user['group_name'])
             # 筛选条件
             if sd:
                 wh.append("r.record_date >= ?")
@@ -788,7 +804,11 @@ class DashboardView:
             m = cb.get()
             if not m:
                 return
-            y, mo = int(m.split('-')[0]), int(m.split('-')[1])
+            parts = m.split('-')
+            if len(parts) != 2 or not parts[0].isdigit() or not parts[1].isdigit():
+                messagebox.showinfo('提示', f'无效的月份格式: {m}')
+                return
+            y, mo = int(parts[0]), int(parts[1])
             _, ld = cal_mod.monthrange(y, mo)
             stats = RecordRepository.get_stats(start_date=f'{m}-01', end_date=f'{y}-{mo:02d}-{ld:02d}', user=self.current_user)
             gen_report(stats, f'{m} 月度汇总')
@@ -810,7 +830,10 @@ class DashboardView:
             m = cb.get()
             if not m:
                 return
-            y, mo = int(m.split('-')[0]), int(m.split('-')[1])
+            parts = m.split('-')
+            if len(parts) != 2 or not parts[0].isdigit() or not parts[1].isdigit():
+                return
+            y, mo = int(parts[0]), int(parts[1])
             _, ld = cal_mod.monthrange(y, mo)
             stats = RecordRepository.get_stats(start_date=f'{m}-01', end_date=f'{y}-{mo:02d}-{ld:02d}', user=self.current_user)
             for r in stats.get('by_worker', []):
@@ -824,10 +847,16 @@ class DashboardView:
             m = cb.get()
             if not m:
                 return
-            y, mo = int(m.split('-')[0]), int(m.split('-')[1])
+            parts = m.split('-')
+            if len(parts) != 2 or not parts[0].isdigit() or not parts[1].isdigit():
+                return
+            y, mo = int(parts[0]), int(parts[1])
             _, ld = cal_mod.monthrange(y, mo)
             stats = RecordRepository.get_stats(start_date=f'{m}-01', end_date=f'{y}-{mo:02d}-{ld:02d}', user=self.current_user)
-            path = os.path.join(_BASE, f'月度汇总_{m}.xlsx')
+            from tkinter import filedialog
+            path = filedialog.asksaveasfilename(defaultextension='.xlsx', filetypes=[('Excel','*.xlsx')], initialfile=f'月度汇总_{m}.xlsx', title='保存月度汇总')
+            if not path:
+                return
             if export_excel(stats, path, f'{m} 月度汇总'):
                 messagebox.showinfo('成功', f'已导出: {path}')
 
@@ -1022,9 +1051,8 @@ class DashboardView:
 
     # ── Logout / Change password ──
     def _logout(self):
-        if messagebox.askyesno('确认', '确定退出登录？'):
-            if self._on_logout:
-                self._on_logout()
+        if self._on_logout:
+            self._on_logout()
 
     def _change_pw(self):
         un = self.current_user['username'] if self.current_user else ''
@@ -1183,7 +1211,10 @@ class DashboardView:
             if sel > 0 and sel <= len(workers):
                 wf = workers[sel - 1]['id']
             stats = RR.get_stats(start_date=sd, end_date=ed, worker_filter=wf, user=self.current_user)
-            export_path = os.path.join(_BASE, '汇总查询.xlsx')
+            from tkinter import filedialog
+            export_path = filedialog.asksaveasfilename(defaultextension='.xlsx', filetypes=[('Excel','*.xlsx')], initialfile='汇总查询.xlsx', title='保存汇总查询')
+            if not export_path:
+                return
             title = '汇总查询'
             if sd or ed:
                 title += f' ({sd or ""}~{ed or ""})'

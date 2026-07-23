@@ -64,6 +64,7 @@ class UserRepository:
         conn = Database.get_conn()
         conn.execute("DELETE FROM users WHERE username=?", (username,))
         conn.execute("DELETE FROM user_permissions WHERE username=?", (username,))
+        conn.execute("DELETE FROM leader_workers WHERE leader_username=?", (username,))
         conn.commit()
         logger.info(f'删除用户: {username}')
         return True
@@ -81,3 +82,23 @@ class UserRepository:
         conn.execute("INSERT OR REPLACE INTO user_permissions (username,perm_key,allowed) VALUES (?,?,?)",
                     (username, perm_key, allowed))
         conn.commit()
+
+    # ── 组长关联工人 ──
+    @staticmethod
+    def get_leader_workers(leader_username: str) -> list[int]:
+        """获取组长关联的工人ID列表"""
+        conn = Database.get_conn()
+        rows = conn.execute("SELECT worker_id FROM leader_workers WHERE leader_username=?",
+                           (leader_username,)).fetchall()
+        return [r['worker_id'] for r in rows]
+
+    @staticmethod
+    def set_leader_workers(leader_username: str, worker_ids: list[int]):
+        """设置组长关联的工人列表（先清空后写入）"""
+        conn = Database.get_conn()
+        conn.execute("DELETE FROM leader_workers WHERE leader_username=?", (leader_username,))
+        for wid in worker_ids:
+            conn.execute("INSERT INTO leader_workers (leader_username,worker_id) VALUES (?,?)",
+                        (leader_username, wid))
+        conn.commit()
+        logger.info(f'组长 {leader_username} 关联工人: {worker_ids}')

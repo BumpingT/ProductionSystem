@@ -19,8 +19,8 @@ def export_excel(stats, filepath, title=''):
     ws.cell(row=1, column=1, value=title_str).font = Font(bold=True, size=13)
     ws.merge_cells('A1:H1')
     t = stats.get('totals', {})
-    ws.cell(row=2, column=1, value=f'\u5de5\u4eba\u6570: {t.get("w",0)}  |  \u603b\u4ea7\u91cf: {t.get("q",0)}  |  \u603b\u5de5\u8d44: {YEN}{round(t.get("e",0),2)}')
-    headers = ['\u5de5\u4eba', '\u7ec4\u522b', '\u4ef6\u6570', '\u5de5\u8d44']
+    ws.cell(row=2, column=1, value=f'\u5de5\u4eba\u6570: {t.get("w",0)}  |  \u603b\u4ea7\u91cf: {t.get("q",0)}  |  \u603b\u5de5\u4ef7: {YEN}{round(t.get("e",0),2)}')
+    headers = ['\u5de5\u4eba', '\u7ec4\u522b', '\u4ef6\u6570', '\u5de5\u4ef7']
     for ci, h in enumerate(headers, 1):
         cell = ws.cell(row=4, column=ci, value=h)
         cell.font = Font(bold=True, color='00ffffff')

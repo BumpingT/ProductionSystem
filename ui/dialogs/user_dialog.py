@@ -60,7 +60,7 @@ class UserDialog:
         self.cb_role.pack(side=LEFT, padx=(2, 8))
         self.cb_role.set('生产工人')
         
-        # ── 关联组别（仅组长显示）──
+        # ── 关联组别 ──
         self._group_list = []
         try:
             rows = WorkerRepository.get_all()
@@ -118,12 +118,8 @@ class UserDialog:
         self.refresh()
 
     def _toggle_group(self):
-        """根据角色显示/隐藏组别下拉框"""
-        is_leader = self.cb_role.get() == '组长'
-        state = 'normal' if is_leader else 'disabled'
-        self.cb_group.config(state=state)
-        if not is_leader:
-            self.cb_group.set('(无)')
+        """组别下拉框始终可用"""
+        self.cb_group.config(state='normal')
         self._update_worker_list()
 
     def _update_worker_list(self):
@@ -201,6 +197,11 @@ class UserDialog:
             return
         
         if UserRepository.add(username, password, display, role, worker_id, group_name):
+            # 如果是组长，自动关联本组所有工人
+            if role == 'leader' and group_name:
+                from models.worker import WorkerRepository
+                group_workers = [w for w in WorkerRepository.get_all() if w.get('group_name') == group_name]
+                UserRepository.set_leader_workers(username, [w['id'] for w in group_workers])
             self.err_label.config(text='', fg=RED)
             self.e_user.delete(0, END)
             self.e_pw.delete(0, END)
@@ -230,7 +231,7 @@ class UserDialog:
         # 弹出编辑对话框
         top = Toplevel(self.top)
         top.title(f'编辑用户 - {un}')
-        top.geometry('360x280')
+        top.geometry('360x260')
         top.configure(bg=CARD)
         top.grab_set()
         top.transient(self.top)
@@ -241,17 +242,11 @@ class UserDialog:
         f = Frame(top, bg=CARD)
         f.pack(padx=20)
         
-        # 显示名
-        Label(f, text='显示名:', bg=CARD, font=('Microsoft YaHei', 9)).grid(row=0, column=0, sticky=W, pady=3)
-        e_dn = Entry(f, width=20, font=('Microsoft YaHei', 10), relief='solid', bd=1)
-        e_dn.insert(0, user.get('display_name', un))
-        e_dn.grid(row=0, column=1, pady=3, padx=(4, 0))
-        
-        Label(f, text='角色:', bg=CARD, font=('Microsoft YaHei', 9)).grid(row=1, column=0, sticky=W, pady=3)
+        Label(f, text='角色:', bg=CARD, font=('Microsoft YaHei', 9)).grid(row=0, column=0, sticky=W, pady=3)
         cb_r = ttk.Combobox(f, values=['生产工人', '组长', '生产部部长', '管理员'], state='readonly', width=18)
         role_cn = ROLE_NAMES.get(user.get('role', 'worker'), '生产工人')
         cb_r.set(role_cn)
-        cb_r.grid(row=1, column=1, pady=3, padx=(4, 0))
+        cb_r.grid(row=0, column=1, pady=3, padx=(4, 0))
         
         # 组别（仅组长）
         group_list = []
@@ -266,41 +261,34 @@ class UserDialog:
         except Exception:
             pass
         gvals = ['(无)'] + group_list
-        Label(f, text='组别:', bg=CARD, font=('Microsoft YaHei', 9)).grid(row=2, column=0, sticky=W, pady=3)
+        Label(f, text='组别:', bg=CARD, font=('Microsoft YaHei', 9)).grid(row=1, column=0, sticky=W, pady=3)
         cb_g = ttk.Combobox(f, values=gvals, state='readonly', width=18)
         cur_group = user.get('group_name', '')
         cb_g.set(cur_group if cur_group else '(无)')
-        cb_g.grid(row=2, column=1, pady=3, padx=(4, 0))
-        # 非组长禁用组别
-        if user.get('role') != 'leader':
-            cb_g.config(state='disabled')
-        # 角色切换时联动组别
-        def _on_role_change(*args):
-            is_leader = cb_r.get() == '组长'
-            cb_g.config(state='normal' if is_leader else 'disabled')
-            if not is_leader:
-                cb_g.set('(无)')
-        cb_r.bind('<<ComboboxSelected>>', _on_role_change)
+        cb_g.grid(row=1, column=1, pady=3, padx=(4, 0))
         
-        Label(f, text='新密码(留空不改):', bg=CARD, font=('Microsoft YaHei', 9)).grid(row=3, column=0, sticky=W, pady=3)
+        Label(f, text='新密码(留空不改):', bg=CARD, font=('Microsoft YaHei', 9)).grid(row=2, column=0, sticky=W, pady=3)
         e_pw = Entry(f, width=20, font=('Microsoft YaHei', 10), relief='solid', bd=1, show='*')
-        e_pw.grid(row=3, column=1, pady=3, padx=(4, 0))
+        e_pw.grid(row=2, column=1, pady=3, padx=(4, 0))
         
         err = Label(top, text='', bg=CARD, fg=RED, font=('Microsoft YaHei', 9))
         err.pack(pady=(4, 0))
         
         def do_save():
-            dn = e_dn.get().strip()
             rl_cn = cb_r.get()
             role_map = ROLE_NAMES_REV
             rl = role_map.get(rl_cn, 'worker')
             npw = e_pw.get()
             gv = cb_g.get()
             gp = gv if gv != '(无)' else ''
-            if not dn:
-                err.config(text='显示名不能为空')
-                return
-            UserRepository.update_profile(un, dn, rl, user.get('worker_id', 0), gp)
+            UserRepository.update_profile(un, un, rl, user.get('worker_id', 0), gp)
+            # 如果是组长，更新管辖工人关联
+            if rl == 'leader' and gp:
+                from models.worker import WorkerRepository
+                group_workers = [w for w in WorkerRepository.get_all() if w.get('group_name') == gp]
+                UserRepository.set_leader_workers(un, [w['id'] for w in group_workers])
+            elif rl != 'leader':
+                UserRepository.set_leader_workers(un, [])
             if npw:
                 if len(npw) < 4:
                     err.config(text='密码至少4位')

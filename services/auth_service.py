@@ -28,6 +28,8 @@ class AuthService:
             return False, '旧密码错误'
         if len(new_password) < 4:
             return False, '新密码至少4位'
+        if verify_password(new_password, user['password_hash']):
+            return False, '新密码不能与旧密码相同'
         UserRepository.update_password(username, new_password)
         logger.info(f'用户 {username} 密码已修改')
         return True, '密码修改成功'

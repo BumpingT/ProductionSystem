@@ -17,6 +17,20 @@ class RecordRepository:
                 WHERE r.worker_id = ?
                 ORDER BY r.id DESC LIMIT 500
             """, (user['worker_id'],)).fetchall()
+        elif user and user.get('role') == 'leader':
+            # 组长：从 leader_workers 表获取关联的工人
+            leader_workers = conn.execute(
+                "SELECT worker_id FROM leader_workers WHERE leader_username=?",
+                (user['username'],)).fetchall()
+            lw_ids = [rw['worker_id'] for rw in leader_workers]
+            if lw_ids:
+                placeholders = ','.join(['?'] * len(lw_ids))
+                rows = conn.execute(base_sql + f"""
+                    WHERE r.worker_id IN ({placeholders})
+                    ORDER BY r.id DESC LIMIT 500
+                """, lw_ids).fetchall()
+            else:
+                rows = []
         elif user and user.get('role') == 'leader' and user.get('group_name'):
             rows = conn.execute(base_sql + """
                 WHERE w.group_name = ?
@@ -63,9 +77,18 @@ class RecordRepository:
         wh = []
         pa = []
         # 组长只能看本组数据（用子查询避免 JOIN 别名冲突）
-        if user and user.get('role') == 'leader' and user.get('group_name'):
-            wh.append("r.worker_id IN (SELECT id FROM workers WHERE group_name=?)")
-            pa.append(user['group_name'])
+        if user and user.get('role') == 'leader':
+            # 优先使用 leader_workers 精确关联
+            lw = conn.execute("SELECT worker_id FROM leader_workers WHERE leader_username=?",
+                             (user['username'],)).fetchall()
+            lw_ids = [r['worker_id'] for r in lw]
+            if lw_ids:
+                wh.append("r.worker_id IN (" + ','.join(['?'] * len(lw_ids)) + ")")
+                pa.extend(lw_ids)
+            elif user.get('group_name'):
+                # 降级到按组别过滤
+                wh.append("r.worker_id IN (SELECT id FROM workers WHERE group_name=?)")
+                pa.append(user['group_name'])
         if start_date:
             wh.append("r.record_date >= ?")
             pa.append(start_date)

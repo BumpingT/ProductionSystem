@@ -15,6 +15,7 @@ class WorkerDialog(CrudDialogBase):
             add_fields=[('姓名', 12), ('组别', 12)]
         )
         self._add_edit_btn()
+        self._add_delete_account_btn()
 
     def _add_edit_btn(self):
         for child in self.top.winfo_children():
@@ -25,6 +26,22 @@ class WorkerDialog(CrudDialogBase):
                                font=('Microsoft YaHei', 9, 'bold'), relief='flat',
                                padx=8, cursor='hand2',
                                command=self.on_edit).pack(side='left', padx=(4, 0))
+                        return
+
+    def _add_delete_account_btn(self):
+        """在按钮栏添加删除工人及账号按钮"""
+        for child in self.top.winfo_children():
+            if isinstance(child, Frame) and child != self.tree.master:
+                for c in child.winfo_children():
+                    if isinstance(c, Frame):
+                        Button(c, text='删除工人及账号', bg=RED, fg='white',
+                               font=('Microsoft YaHei', 9, 'bold'), relief='flat',
+                               padx=8, cursor='hand2',
+                               command=self._on_delete_with_account).pack(side='left', padx=(4, 0))
+                        Button(c, text='仅删除账号', bg='#cc6600', fg='white',
+                               font=('Microsoft YaHei', 9, 'bold'), relief='flat',
+                               padx=8, cursor='hand2',
+                               command=self._on_delete_account_only).pack(side='left', padx=(4, 0))
                         return
 
     def refresh(self):
@@ -98,3 +115,49 @@ class WorkerDialog(CrudDialogBase):
         if messagebox.askyesno('确认', f'删除工人 "{vals[0]}"？'):
             WorkerService.delete(int(item))
             self.refresh()
+
+    def _on_delete_with_account(self):
+        """删除选中的工人及其关联的用户账号"""
+        sel = self.tree.selection()
+        if not sel:
+            messagebox.showinfo('提示', '请先选择一个工人')
+            return
+        item = sel[0]
+        vals = self.tree.item(item, 'values')
+        wid = int(item)
+        from models.user import UserRepository
+        user = UserRepository.get_by_worker_id(wid)
+        msg = f'确定删除工人 "{vals[0]}"'
+        if user:
+            msg += f' 及其关联账号 "{user["username"]}"'
+        msg += '？'
+        if not messagebox.askyesno('确认', msg):
+            return
+        if user:
+            UserRepository.delete(user['username'])
+        WorkerService.delete(wid)
+        self.refresh()
+        msg2 = f'工人 "{vals[0]}" 已删除'
+        if user:
+            msg2 += f'，关联账号 "{user["username"]}" 已同步删除'
+        messagebox.showinfo('成功', msg2)
+
+    def _on_delete_account_only(self):
+        """仅删除选中工人关联的账号，不删工人"""
+        sel = self.tree.selection()
+        if not sel:
+            messagebox.showinfo('提示', '请先选择一个工人')
+            return
+        item = sel[0]
+        vals = self.tree.item(item, 'values')
+        wid = int(item)
+        from models.user import UserRepository
+        user = UserRepository.get_by_worker_id(wid)
+        if not user:
+            messagebox.showinfo('提示', f'工人 "{vals[0]}" 没有关联的账号')
+            return
+        if not messagebox.askyesno('确认', f'确定仅删除工人 "{vals[0]}" 关联的账号 "{user["username"]}"？工人本身不会被删除。'):
+            return
+        UserRepository.delete(user['username'])
+        self.refresh()
+        messagebox.showinfo('成功', f'账号 "{user["username"]}" 已删除，工人 "{vals[0]}" 保留')

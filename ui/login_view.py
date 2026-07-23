@@ -76,6 +76,10 @@ class LoginView:
         if not un or not pw:
             messagebox.showinfo('提示', '请输入用户名和密码')
             return
+        # 去掉密码首尾空格，避免用户不小心输入了空格
+        pw_stripped = pw.strip()
+        if pw != pw_stripped:
+            pw = pw_stripped
         user = AuthService.login(un, pw)
         if not user:
             messagebox.showerror('错误', '用户名或密码错误')
