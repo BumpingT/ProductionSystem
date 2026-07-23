@@ -6,7 +6,8 @@ from ui.widgets.crud_dialog_base import CrudDialogBase
 
 
 class WorkerDialog(CrudDialogBase):
-    def __init__(self, parent):
+    def __init__(self, parent, user=None):
+        self._user = user
         super().__init__(
             parent=parent,
             title='管理工人',
@@ -46,7 +47,15 @@ class WorkerDialog(CrudDialogBase):
 
     def refresh(self):
         self.tree.delete(*self.tree.get_children())
-        for w in WorkerService.get_all():
+        from models.user import UserRepository
+        from models.worker import WorkerRepository as WR
+        all_w = WR.get_all()
+        # 组长只能看到自己管辖的工人
+        if self._user and self._user.get('role') == 'leader':
+            lw_ids = UserRepository.get_leader_workers(self._user['username'])
+            if lw_ids:
+                all_w = [w for w in all_w if w['id'] in lw_ids]
+        for w in all_w:
             self.tree.insert('', 'end', iid=str(w['id']), values=(w['name'], w['group_name']))
 
     def on_add(self):

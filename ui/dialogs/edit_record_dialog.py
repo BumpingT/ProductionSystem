@@ -1,7 +1,7 @@
 """
 编辑记录对话框 — 从 DashboardView 拆分为独立组件
 """
-from tkinter import Toplevel, Label, Frame, Button, Entry, ttk, W, CENTER
+from tkinter import Toplevel, Label, Frame, Button, Entry, ttk, W, CENTER, LEFT, X, END, RIGHT, Y, BOTH
 from tkinter import messagebox
 from config import CARD, DARK, ACCENT, RED, YEN
 from models.record import RecordRepository
@@ -129,6 +129,7 @@ class EditRecordDialog:
         self.e_date = Entry(row4, width=14, font=('Microsoft YaHei', 11),
                             relief='solid', bd=1, justify=CENTER)
         self.e_date.pack(side=LEFT)
+        self.e_date.bind('<Button-1>', lambda e: self._show_calendar(self.e_date))
 
         # 查找原始工人和工序的索引
         self.orig_worker_idx = 0
@@ -217,9 +218,16 @@ class EditRecordDialog:
             self.err_label.config(text='请填写件数')
             return
         try:
-            qty = float(qty_s)
+            qty_f = float(qty_s)
+            if qty_f != int(qty_f):
+                self.err_label.config(text='件数必须为正整数')
+                return
+            qty = int(qty_f)
         except ValueError:
-            self.err_label.config(text='件数必须为数字')
+            self.err_label.config(text='件数必须为正整数')
+            return
+        if qty < 1:
+            self.err_label.config(text='件数必须大于0')
             return
         if not d:
             self.err_label.config(text='请填写日期')
@@ -241,3 +249,62 @@ class EditRecordDialog:
         self.top.destroy()
         if self.on_save_callback:
             self.on_save_callback()
+
+    def _show_calendar(self, entry):
+        """弹出日历选择器"""
+        import calendar as cal_mod
+        from tkinter import Toplevel, Button
+        top = Toplevel(self.top)
+        top.title('选择日期')
+        top.geometry('300x260')
+        top.resizable(False, False)
+        top.configure(bg=CARD)
+        top.grab_set()
+        top.transient(self.top)
+
+        from datetime import date as dt_date
+        now = dt_date.today()
+        yy, mm = now.year, now.month
+
+        def _refresh():
+            for w in f.winfo_children():
+                w.destroy()
+            Label(f, text=f'{yy}年{mm:02d}月', bg=CARD, fg=DARK,
+                  font=('Microsoft YaHei', 10, 'bold')).grid(row=0, column=0, columnspan=7, pady=4)
+            for di, dn in enumerate(['一','二','三','四','五','六','日']):
+                Label(f, text=dn, bg=CARD, fg='#888', font=('Microsoft YaHei', 8),
+                      width=4).grid(row=1, column=di, pady=1)
+            _, ld = cal_mod.monthrange(yy, mm)
+            for d in range(1, ld + 1):
+                wd = cal_mod.weekday(yy, mm, d)
+                btn = Button(f, text=str(d), width=4, bg='white', relief='flat',
+                           font=('Microsoft YaHei', 9), cursor='hand2',
+                           command=lambda d=d: select(d))
+                btn.grid(row=(d - 1) // 7 + 2, column=wd, padx=1, pady=1)
+
+        def prev():
+            nonlocal yy, mm
+            mm -= 1
+            if mm < 1: mm, yy = 12, yy - 1
+            _refresh()
+
+        def nxt():
+            nonlocal yy, mm
+            mm += 1
+            if mm > 12: mm, yy = 1, yy + 1
+            _refresh()
+
+        def select(d):
+            entry.delete(0, 'end')
+            entry.insert(0, f'{yy}-{mm:02d}-{d:02d}')
+            top.destroy()
+
+        bf = Frame(top, bg=CARD)
+        bf.pack(pady=(6, 0))
+        Button(bf, text='‹ 上月', bg=CARD, relief='flat', cursor='hand2',
+               font=('Microsoft YaHei', 9), command=prev).pack(side=LEFT, padx=10)
+        Button(bf, text='下月 ›', bg=CARD, relief='flat', cursor='hand2',
+               font=('Microsoft YaHei', 9), command=nxt).pack(side=LEFT, padx=10)
+        f = Frame(top, bg=CARD)
+        f.pack(pady=6)
+        _refresh()

@@ -239,7 +239,7 @@ class DashboardView:
                     ('price', '单价', 60), ('wage', '工价', 70), ('date', '日期', 100)]
         for col, text, w in col_defs:
             self._tree.heading(col, text=text)
-            self._tree.column(col, width=w, anchor=CENTER if col in ('id', 'qty', 'price', 'wage') else W)
+            self._tree.column(col, width=w, anchor=CENTER if col in ('id', 'qty', 'price', 'wage', 'date') else W)
         self._tree.pack(side=LEFT, fill=BOTH, expand=True)
         vsb = Scrollbar(tree_frame, orient=VERTICAL, command=self._tree.yview)
         self._tree.configure(yscrollcommand=vsb.set)
@@ -314,7 +314,11 @@ class DashboardView:
             messagebox.showinfo('提示', '请选择工人、工序并填写件数')
             return
         try:
-            qty = int(qty_s)
+            qty_f = float(qty_s)
+            if qty_f != int(qty_f):
+                messagebox.showinfo('提示', '件数必须为正整数')
+                return
+            qty = int(qty_f)
         except ValueError:
             messagebox.showinfo('提示', '件数必须为正整数')
             return
@@ -650,7 +654,7 @@ class DashboardView:
         if not self._check_perm('worker_manage'):
             messagebox.showinfo('提示', '您没有管理工人的权限')
             return
-        WorkerDialog(self.root)
+        WorkerDialog(self.root, self.current_user)
 
     def _manage_processes(self):
         if not self._check_perm('process_manage'):

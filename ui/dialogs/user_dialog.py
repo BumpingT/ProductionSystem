@@ -316,9 +316,33 @@ class UserDialog:
         cb_g.set(cur_group if cur_group else '(无)')
         cb_g.grid(row=2, column=1, pady=3, padx=(4, 0))
         
-        Label(f, text='新密码(留空不改):', bg=CARD, font=('Microsoft YaHei', 9)).grid(row=3, column=0, sticky=W, pady=3)
+        # 关联工人（仅生产工人显示）
+        worker_frame = Frame(f, bg=CARD)
+        worker_frame.grid(row=3, column=0, columnspan=2, sticky=W, pady=1)
+        Label(worker_frame, text='关联工人:', bg=CARD, font=('Microsoft YaHei', 9)).pack(side=LEFT)
+        all_workers = WorkerRepository.get_all()
+        worker_names = ['(无)'] + [w['name'] for w in all_workers]
+        cb_w = ttk.Combobox(worker_frame, values=worker_names, state='readonly', width=18)
+        cur_wid = user.get('worker_id', 0)
+        if cur_wid:
+            for w in all_workers:
+                if w['id'] == cur_wid:
+                    cb_w.set(w['name'])
+                    break
+        if not cur_wid or not cb_w.get():
+            cb_w.set('(无)')
+        cb_w.pack(side=LEFT, padx=(4, 0))
+        # 组长/部长/管理员隐藏，其他角色（含自定义）显示
+        def _toggle_worker_frame():
+            role = cb_r.get()
+            is_hidden = role in ('组长', '生产部部长', '管理员')
+            worker_frame.grid_remove() if is_hidden else worker_frame.grid()
+        _toggle_worker_frame()
+        cb_r.bind('<<ComboboxSelected>>', lambda e: _toggle_worker_frame())
+        
+        Label(f, text='新密码(留空不改):', bg=CARD, font=('Microsoft YaHei', 9)).grid(row=4, column=0, sticky=W, pady=3)
         e_pw = Entry(f, width=20, font=('Microsoft YaHei', 10), relief='solid', bd=1, show='*')
-        e_pw.grid(row=3, column=1, pady=3, padx=(4, 0))
+        e_pw.grid(row=4, column=1, pady=3, padx=(4, 0))
         
         err = Label(top, text='', bg=CARD, fg=RED, font=('Microsoft YaHei', 9))
         err.pack(pady=(4, 0))
@@ -334,18 +358,22 @@ class UserDialog:
             npw = e_pw.get().strip()
             gv = cb_g.get()
             gp = gv if gv != '(无)' else ''
+            # 获取关联工人ID
+            new_wid = 0
+            w_idx = cb_w.current()
+            if w_idx > 0 and w_idx <= len(all_workers):
+                new_wid = all_workers[w_idx - 1]['id']
             # 如果用户名变了，先重命名
             if new_un != un:
                 if not UserRepository.rename(un, new_un):
                     err.config(text='用户名已存在或重命名失败')
                     return
-            UserRepository.update_profile(new_un, new_un, rl, user.get('worker_id', 0), gp)
+            UserRepository.update_profile(new_un, new_un, rl, new_wid, gp)
             # 如果有关联工人且改了组别，同步更新工人的组别
-            wid = user.get('worker_id', 0)
-            if wid and gp:
+            if new_wid and gp:
                 for w in WorkerRepository.get_all():
-                    if w['id'] == wid:
-                        WorkerRepository.update(wid, w['name'], gp)
+                    if w['id'] == new_wid:
+                        WorkerRepository.update(new_wid, w['name'], gp)
                         break
             # 如果是组长，更新管辖工人关联
             if rl == 'leader' and gp:
