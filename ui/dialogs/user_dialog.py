@@ -120,6 +120,7 @@ class UserDialog:
         self.err_label.pack()
         
         self.refresh()
+        self.top.wait_window()  # 阻塞直到对话框关闭
 
     def _save_and_refresh(self):
         """刷新并保持选中行置顶"""
@@ -284,11 +285,17 @@ class UserDialog:
         f = Frame(top, bg=CARD)
         f.pack(padx=20)
         
-        Label(f, text='角色:', bg=CARD, font=('Microsoft YaHei', 9)).grid(row=0, column=0, sticky=W, pady=3)
+        # 用户名
+        Label(f, text='用户名:', bg=CARD, font=('Microsoft YaHei', 9)).grid(row=0, column=0, sticky=W, pady=3)
+        e_un = Entry(f, width=20, font=('Microsoft YaHei', 10), relief='solid', bd=1)
+        e_un.insert(0, un)
+        e_un.grid(row=0, column=1, pady=3, padx=(4, 0))
+        
+        Label(f, text='角色:', bg=CARD, font=('Microsoft YaHei', 9)).grid(row=1, column=0, sticky=W, pady=3)
         cb_r = ttk.Combobox(f, values=['生产工人', '组长', '生产部部长', '管理员'], state='normal', width=18)
         role_cn = ROLE_NAMES.get(user.get('role', 'worker'), '生产工人')
         cb_r.set(role_cn)
-        cb_r.grid(row=0, column=1, pady=3, padx=(4, 0))
+        cb_r.grid(row=1, column=1, pady=3, padx=(4, 0))
         
         # 组别（仅组长）
         group_list = []
@@ -303,27 +310,36 @@ class UserDialog:
         except Exception:
             pass
         gvals = ['(无)'] + group_list
-        Label(f, text='组别:', bg=CARD, font=('Microsoft YaHei', 9)).grid(row=1, column=0, sticky=W, pady=3)
+        Label(f, text='组别:', bg=CARD, font=('Microsoft YaHei', 9)).grid(row=2, column=0, sticky=W, pady=3)
         cb_g = ttk.Combobox(f, values=gvals, state='readonly', width=18)
         cur_group = user.get('group_name', '')
         cb_g.set(cur_group if cur_group else '(无)')
-        cb_g.grid(row=1, column=1, pady=3, padx=(4, 0))
+        cb_g.grid(row=2, column=1, pady=3, padx=(4, 0))
         
-        Label(f, text='新密码(留空不改):', bg=CARD, font=('Microsoft YaHei', 9)).grid(row=2, column=0, sticky=W, pady=3)
+        Label(f, text='新密码(留空不改):', bg=CARD, font=('Microsoft YaHei', 9)).grid(row=3, column=0, sticky=W, pady=3)
         e_pw = Entry(f, width=20, font=('Microsoft YaHei', 10), relief='solid', bd=1, show='*')
-        e_pw.grid(row=2, column=1, pady=3, padx=(4, 0))
+        e_pw.grid(row=3, column=1, pady=3, padx=(4, 0))
         
         err = Label(top, text='', bg=CARD, fg=RED, font=('Microsoft YaHei', 9))
         err.pack(pady=(4, 0))
         
         def do_save():
+            new_un = e_un.get().strip()
+            if not new_un:
+                err.config(text='用户名不能为空')
+                return
             rl_cn = cb_r.get()
             role_map = ROLE_NAMES_REV
-            rl = role_map.get(rl_cn, rl_cn)  # 自定义角色直接存储
+            rl = role_map.get(rl_cn, rl_cn)
             npw = e_pw.get().strip()
             gv = cb_g.get()
             gp = gv if gv != '(无)' else ''
-            UserRepository.update_profile(un, un, rl, user.get('worker_id', 0), gp)
+            # 如果用户名变了，先重命名
+            if new_un != un:
+                if not UserRepository.rename(un, new_un):
+                    err.config(text='用户名已存在或重命名失败')
+                    return
+            UserRepository.update_profile(new_un, new_un, rl, user.get('worker_id', 0), gp)
             # 如果有关联工人且改了组别，同步更新工人的组别
             wid = user.get('worker_id', 0)
             if wid and gp:
@@ -334,14 +350,14 @@ class UserDialog:
             # 如果是组长，更新管辖工人关联
             if rl == 'leader' and gp:
                 group_workers = [w for w in WorkerRepository.get_all() if w.get('group_name') == gp]
-                UserRepository.set_leader_workers(un, [w['id'] for w in group_workers])
+                UserRepository.set_leader_workers(new_un, [w['id'] for w in group_workers])
             elif rl != 'leader':
-                UserRepository.set_leader_workers(un, [])
+                UserRepository.set_leader_workers(new_un, [])
             if npw:
                 if len(npw) < 4:
                     err.config(text='密码至少4位')
                     return
-                UserRepository.update_password(un, npw)
+                UserRepository.update_password(new_un, npw)
             top.destroy()
             self._save_and_refresh()
             messagebox.showinfo('成功', '用户信息已更新', parent=self.top)

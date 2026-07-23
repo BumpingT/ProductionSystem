@@ -1,7 +1,7 @@
 """
 权限管理对话框 — 从 DashboardView 拆分为独立组件
 """
-from tkinter import Toplevel, Label, Frame, Canvas, Scrollbar, Checkbutton, IntVar, VERTICAL, HORIZONTAL, BOTTOM
+from tkinter import Toplevel, Label, Frame, Canvas, Scrollbar, Checkbutton, IntVar, VERTICAL, HORIZONTAL, BOTTOM, RIGHT, LEFT, X, Y, BOTH
 from config import CARD, DARK
 from models.user import UserRepository
 from config import ROLE_NAMES

@@ -102,3 +102,20 @@ class UserRepository:
                         (leader_username, wid))
         conn.commit()
         logger.info(f'组长 {leader_username} 关联工人: {worker_ids}')
+
+    @staticmethod
+    def rename(old_username: str, new_username: str) -> bool:
+        """重命名用户（同步更新关联表）"""
+        if old_username == 'admin':
+            return False
+        conn = Database.get_conn()
+        try:
+            conn.execute("UPDATE users SET username=? WHERE username=?", (new_username, old_username))
+            conn.execute("UPDATE user_permissions SET username=? WHERE username=?", (new_username, old_username))
+            conn.execute("UPDATE leader_workers SET leader_username=? WHERE leader_username=?", (new_username, old_username))
+            conn.commit()
+            logger.info(f'用户重命名: {old_username} -> {new_username}')
+            return True
+        except Exception as e:
+            logger.warning(f'用户重命名失败: {e}')
+            return False

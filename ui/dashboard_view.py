@@ -264,8 +264,9 @@ class DashboardView:
             role_en = self.current_user.get('role', '')
             from config import ROLE_NAMES
             role_cn = ROLE_NAMES.get(role_en, role_en)
-            Label(bt, text=f'当前用户: {dn} ({un}) - {role_cn}', bg='white', fg='#888',
-                  font=('Microsoft YaHei', 8)).pack(side=LEFT, padx=12)
+            self._status_label = Label(bt, text=f'当前用户: {dn} ({un}) - {role_cn}', bg='white', fg='#888',
+                  font=('Microsoft YaHei', 8))
+        self._status_label.pack(side=LEFT, padx=12)
         Button(bt, text='修改密码', bg='#2980b9', fg='white',
                font=('Microsoft YaHei', 9, 'bold'), relief='flat',
                padx=10, pady=2, cursor='hand2',
@@ -660,6 +661,14 @@ class DashboardView:
     def _manage_users(self):
         logger.info('_manage_users 被调用')
         UserDialog(self.root)
+        # 对话框关闭后，刷新当前用户信息（可能用户名被改了）
+        if self.current_user:
+            from models.user import UserRepository
+            refreshed = UserRepository.get_by_username(self.current_user['username'])
+            if refreshed:
+                self.current_user = refreshed
+            # 刷新底部状态栏
+            self._refresh_status_bar()
 
     def _manage_permissions(self):
         self._show_permission_dialog()
@@ -751,6 +760,16 @@ class DashboardView:
     def _logout(self):
         if self._on_logout:
             self._on_logout()
+
+    def _refresh_status_bar(self):
+        """更新底部状态栏的当前用户信息"""
+        if hasattr(self, '_status_label') and self.current_user:
+            un = self.current_user.get('username', '')
+            dn = self.current_user.get('display_name', '')
+            role_en = self.current_user.get('role', '')
+            from config import ROLE_NAMES
+            role_cn = ROLE_NAMES.get(role_en, role_en)
+            self._status_label.config(text=f'当前用户: {dn} ({un}) - {role_cn}')
 
     def _change_pw(self):
         """修改密码 — 委托给 ChangePasswordDialog"""
