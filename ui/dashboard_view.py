@@ -314,11 +314,11 @@ class DashboardView:
             messagebox.showinfo('提示', '请选择工人、工序并填写件数')
             return
         try:
-            qty = float(qty_s)
+            qty = int(qty_s)
         except ValueError:
-            messagebox.showinfo('提示', '件数必须为数字')
+            messagebox.showinfo('提示', '件数必须为正整数')
             return
-        if qty <= 0:
+        if qty < 1:
             messagebox.showinfo('提示', '件数必须大于0')
             return
         widsel = self._worker_ids[wid]
