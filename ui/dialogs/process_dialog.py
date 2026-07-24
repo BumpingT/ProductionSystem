@@ -118,6 +118,9 @@ class ProcessDialog:
     def refresh(self):
         self.tree.delete(*self.tree.get_children())
         for p in ProcessService.get_all():
+            iid = str(p['id'])
+            if iid in self.tree.get_children():
+                continue
             # 组装显示文本：编号(名称)-版本
             ver = f"-{p.get('material_version', '')}" if p.get('material_version') else ''
             mat_display = f"{p['material_code']}({p.get('material_name', '')}){ver}"

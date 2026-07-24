@@ -26,6 +26,13 @@ class LoginView:
         self.top.configure(bg=CARD)
         self.top.resizable(False, False)
         self.top.grab_set()
+        # 居中显示
+        self.top.update_idletasks()
+        sw = self.top.winfo_screenwidth()
+        sh = self.top.winfo_screenheight()
+        x = (sw - 340) // 2
+        y = (sh - 320) // 2
+        self.top.geometry(f'+{x}+{y}')
 
         Label(self.top, text='生产管理系统', font=('Microsoft YaHei', 16, 'bold'),
               bg=CARD, fg=PRIMARY).pack(pady=(24, 4))

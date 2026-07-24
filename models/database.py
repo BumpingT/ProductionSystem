@@ -50,8 +50,7 @@ class Database:
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             material_code TEXT NOT NULL,
             process_name TEXT NOT NULL,
-            unit_price REAL NOT NULL DEFAULT 0,
-            UNIQUE(material_code, process_name)
+            unit_price REAL NOT NULL DEFAULT 0
         )""")
         c.execute("""CREATE TABLE IF NOT EXISTS groups (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -187,6 +186,29 @@ class Database:
                 logger.info('数据库迁移: materials 重建表(去掉 code UNIQUE)')
             except Exception as e:
                 logger.warning(f'数据库迁移 materials 失败: {e}')
+        # 兼容旧数据库：processes 表去掉 UNIQUE(material_code, process_name) 约束
+        try:
+            c.execute("INSERT INTO processes (material_code,process_name,unit_price) VALUES ('@@migrate_test@@','@@migrate_test@@',0)")
+            c.execute("INSERT INTO processes (material_code,process_name,unit_price) VALUES ('@@migrate_test@@','@@migrate_test@@',0)")
+            c.execute("DELETE FROM processes WHERE material_code='@@migrate_test@@'")
+        except Exception:
+            try:
+                c.execute("DELETE FROM processes WHERE material_code='@@migrate_test@@'")
+            except:
+                pass
+            try:
+                c.execute("""CREATE TABLE processes_new (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    material_code TEXT NOT NULL,
+                    process_name TEXT NOT NULL,
+                    unit_price REAL NOT NULL DEFAULT 0
+                )""")
+                c.execute("INSERT INTO processes_new (id,material_code,process_name,unit_price) SELECT id,material_code,process_name,unit_price FROM processes")
+                c.execute("DROP TABLE processes")
+                c.execute("ALTER TABLE processes_new RENAME TO processes")
+                logger.info('数据库迁移: processes 重建表(去掉 UNIQUE)')
+            except Exception as e:
+                logger.warning(f'数据库迁移 processes 失败: {e}')
 
         conn.commit()
         logger.info('数据库初始化完成')

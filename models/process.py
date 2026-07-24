@@ -12,6 +12,7 @@ class ProcessRepository:
                    m.name AS material_name, m.version AS material_version
             FROM processes p
             LEFT JOIN materials m ON p.material_code = m.code
+            GROUP BY p.id
             ORDER BY p.material_code, p.process_name
         """).fetchall()
         return [dict(r) for r in rows]

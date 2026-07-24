@@ -4,8 +4,8 @@ from config import YEN
 from utils.logger import logger
 
 
-def export_excel(stats, filepath, title=''):
-    """导出统计数据到 Excel"""
+def export_excel(stats, filepath, title='', records=None):
+    """导出统计数据到 Excel，records 为可选的生产记录明细"""
     try:
         import openpyxl
         from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
@@ -31,6 +31,38 @@ def export_excel(stats, filepath, title=''):
         ws.cell(row=ri, column=2, value=r.get('group_name', ''))
         ws.cell(row=ri, column=3, value=r.get('q', 0))
         ws.cell(row=ri, column=4, value=round(r.get('e', 0), 2))
+    if records:
+        # 写入生产记录明细
+        detail_row = len(stats.get('by_worker', [])) + 7
+        ws.cell(row=detail_row, column=1, value='生产记录明细').font = Font(bold=True, size=12)
+        ws.merge_cells(start_row=detail_row, start_column=1, end_row=detail_row, end_column=9)
+        detail_row += 1
+        det_headers = ['ID', '物料编号', '工序', '工人', '班组', '件数', '工价', '总价', '日期']
+        for ci, h in enumerate(det_headers, 1):
+            cell = ws.cell(row=detail_row, column=ci, value=h)
+            cell.font = Font(bold=True, color='00ffffff')
+            cell.fill = PatternFill('solid', fgColor='002980b9')
+            cell.alignment = Alignment(horizontal='center')
+        for ri, r in enumerate(records, detail_row + 1):
+            ws.cell(row=ri, column=1, value=r.get('id', ''))
+            ws.cell(row=ri, column=2, value=r.get('material_code', ''))
+            ws.cell(row=ri, column=3, value=r.get('process_name', ''))
+            ws.cell(row=ri, column=4, value=r.get('worker_name', ''))
+            ws.cell(row=ri, column=5, value=r.get('group_name', ''))
+            ws.cell(row=ri, column=6, value=r.get('quantity', 0))
+            ws.cell(row=ri, column=7, value=r.get('unit_price', 0))
+            ws.cell(row=ri, column=8, value=round(r.get('quantity', 0) * r.get('unit_price', 0), 2))
+            ws.cell(row=ri, column=9, value=r.get('record_date', ''))
+        # 设置列宽
+        ws.column_dimensions['A'].width = 8
+        ws.column_dimensions['B'].width = 16
+        ws.column_dimensions['C'].width = 12
+        ws.column_dimensions['D'].width = 10
+        ws.column_dimensions['E'].width = 10
+        ws.column_dimensions['F'].width = 8
+        ws.column_dimensions['G'].width = 8
+        ws.column_dimensions['H'].width = 10
+        ws.column_dimensions['I'].width = 14
     wb.save(filepath)
     logger.info(f'Excel \u5df2\u5bfc\u51fa: {filepath}')
     return True

@@ -25,6 +25,13 @@ class App:
         self.root = Tk()
         self.root.title('生产管理系统')
         self.root.geometry('1200x750')
+        # 居中显示
+        self.root.update_idletasks()
+        sw = self.root.winfo_screenwidth()
+        sh = self.root.winfo_screenheight()
+        x = (sw - 1200) // 2
+        y = (sh - 750) // 2
+        self.root.geometry(f'1200x750+{x}+{y}')
         from config import BG
         self.root.configure(bg=BG)
         self.root.withdraw()

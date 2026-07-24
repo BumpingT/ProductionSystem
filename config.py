@@ -16,14 +16,14 @@ DB_PATH = os.path.join(_BASE, 'data.db')
 ECHARTS_PATH = _rp('echarts.min.js')
 LOGIN_CRED_PATH = os.path.join(_BASE, '.login_cred')
 
-# ── 颜色主题 ──
-BG = '#f0f2f5'
+# ── 颜色主题（深灰）──
+BG = '#e8eaed'
 CARD = '#ffffff'
-PRIMARY = '#1a73e8'
+PRIMARY = '#546e7a'
 ACCENT = '#e67e22'
 GREEN = '#27ae60'
 RED = '#e74c3c'
-DARK = '#2c3e50'
+DARK = '#37474f'
 
 # ── 权限 ──
 ALL_PERMS = ['record_add','record_delete','record_edit','material_manage',

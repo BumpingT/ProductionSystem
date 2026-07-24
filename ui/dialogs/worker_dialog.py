@@ -265,6 +265,10 @@ class WorkerDialog:
             self.refresh()
 
     def _on_add_group(self):
+        # 组长不能添加班组
+        if self._user and self._user.get('role') == 'leader':
+            messagebox.showinfo('提示', '组长不能添加班组', parent=self.top)
+            return
         gname = self.e_group.get().strip()
         if not gname:
             messagebox.showinfo('提示', '请输入班组名称', parent=self.top)

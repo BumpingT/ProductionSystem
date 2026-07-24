@@ -164,7 +164,7 @@ class DashboardView:
               font=('Microsoft YaHei', 9)).pack(side=LEFT, padx=(6, 0))
         self._filter_sort = ttk.Combobox(filter_bar, values=['最新优先', '最早优先'],
                                           state='readonly', width=9)
-        self._filter_sort.set('最新优先')
+        self._filter_sort.set('最早优先')
         self._filter_sort.pack(side=LEFT, padx=(2, 4))
         self._filter_sort.bind('<<ComboboxSelected>>', lambda e: self._apply_filter())
 
@@ -265,7 +265,7 @@ class DashboardView:
                                    show='headings', height=12)
         col_defs = [('id', 'ID', 40), ('material', '物料', 80), ('process', '工序', 100),
                     ('worker', '姓名', 70), ('group', '班组', 70), ('qty', '件数', 60),
-                    ('price', '工价', 60), ('wage', '总价', 70), ('date', '日期', 100)]
+                    ('price', '工价', 60), ('wage', '总价', 70), ('date', '日期', 110)]
         for col, text, w in col_defs:
             self._tree.heading(col, text=text)
             self._tree.column(col, width=w, anchor=CENTER)
@@ -282,6 +282,7 @@ class DashboardView:
         bottom.pack(fill=X, pady=(4, 0))
         self._make_btn(bottom, '📊 生成图表报告', self._open_chart, 'chart_view', PRIMARY)
         self._make_btn(bottom, '📅 月度汇总', self._monthly_summary, 'monthly_view', GREEN)
+        self._make_btn(bottom, '导出 Excel', self._export_main_table, 'chart_view', GREEN)
 
         # ── Status bar ──
         bt = Frame(self.root, bg='white', highlightbackground='#ddd',
@@ -522,6 +523,23 @@ class DashboardView:
         tree.tag_configure('empty_hint', foreground='#999999', font=('Microsoft YaHei', 9),
                            anchor='center')
 
+    def _export_main_table(self):
+        """导出主表生产记录到 Excel"""
+        records = RecordRepository.get_all(self.current_user, order_sql='ORDER BY r.record_date ASC, r.id ASC')
+        if not records:
+            messagebox.showinfo('提示', '当前没有可导出的记录')
+            return
+        from tkinter import filedialog
+        path = filedialog.asksaveasfilename(defaultextension='.xlsx',
+            filetypes=[('Excel','*.xlsx')], initialfile='生产记录.xlsx', title='导出生产记录')
+        if not path:
+            return
+        from models.record import RecordRepository as RR
+        stats = RR.get_stats(user=self.current_user)
+        t = stats.get('totals', {})
+        if export_excel({'totals': t, 'by_worker': []}, path, '生产记录', records=records):
+            messagebox.showinfo('成功', f'已导出 {len(records)} 条记录')
+
     def _get_order_sql(self, default_desc=True):
         """根据排序选择器返回 ORDER BY 子句"""
         sort = getattr(self, '_filter_sort', None)
@@ -535,7 +553,7 @@ class DashboardView:
         if not self._tree:
             return
         self._tree.delete(*self._tree.get_children())
-        records = RecordRepository.get_all(self.current_user, order_sql=self._get_order_sql())
+        records = RecordRepository.get_all(self.current_user, order_sql='ORDER BY r.record_date ASC, r.id ASC')
         for r in records[:200]:
             wage = r['quantity'] * r['unit_price']
             # 格式化物料显示
